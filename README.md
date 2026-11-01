@@ -4,15 +4,19 @@ An experimental Android app that runs the [OpenCode](https://github.com/sst/open
 server inside an Alpine Linux userland using proot, then opens the OpenCode web UI
 in a WebView.
 
-> **Status:** Phase 0/1 spike. Not production-ready. The server lifecycle,
-> foreground service, release packaging and arm64 asset are still in progress.
+> **Status:** Pre-release. The native app shell is built and unit-tested (home with
+> session history and search, file manager, terminal, settings, foreground service with
+> crash restart and idle stop), but it has **not yet been run on a real device**. Release
+> packaging (Play asset pack, 16 KB page alignment), LAN mode and secure key storage are
+> still to do. See `docs/device-test-checklist.md`.
 > This is an unofficial project and is not affiliated with the OpenCode project.
 
 ## Layout
 
-- `app/` — Flutter Android app and spike UI.
+- `app/` — Flutter Android app: onboarding, Home (history + search), Files, Terminal, Settings;
+  chat is the OpenCode web UI opened on a chosen session.
 - `packages/opencode_runtime/` — Kotlin runtime: rootfs installer, proot launcher,
-  server supervisor and PTY bridge.
+  server supervisor/controller, foreground service, terminals, sandboxed file manager.
 - `native/proot/` — fetches and patches the Termux proot binaries.
 - `rootfs/` — builds the Alpine + OpenCode rootfs.
 - `docs/` — design notes and spike results.
