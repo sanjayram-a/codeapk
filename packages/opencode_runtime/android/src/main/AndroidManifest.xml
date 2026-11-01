@@ -1,1 +1,13 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Keeps the process alive while the user-configured OpenCode server runs in the private sandbox. -->
+        <service
+            android:name="dev.opencodeapk.runtime.RuntimeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Runs the user-configured OpenCode coding-agent server in a private Linux sandbox" />
+        </service>
+    </application>
+</manifest>

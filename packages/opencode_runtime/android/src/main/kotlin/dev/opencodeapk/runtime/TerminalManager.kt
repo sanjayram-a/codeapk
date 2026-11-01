@@ -101,6 +101,10 @@ class TerminalManager(
     @Synchronized
     fun count(): Int = sessions.values.count { !it.exited }
 
+    /** Live sessions that a Dart listener is attached to. Only these keep the server from idle-stopping. */
+    @Synchronized
+    fun attachedCount(): Int = sessions.values.count { !it.exited && it.attached }
+
     /** Live sessions that no Dart listener is attached to. */
     @Synchronized
     fun detachedIds(): List<Int> = sessions.filter { !it.value.attached }.keys.toList()
