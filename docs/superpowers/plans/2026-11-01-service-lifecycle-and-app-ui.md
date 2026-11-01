@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn the Phase 0–1 spike into the real app. The OpenCode server survives the app being swiped away, restarts after a crash and stops when idle. The UI has onboarding, setup, an OpenCode tab, a Terminal tab, an Environment tab and a Settings tab.
+**Goal:** Turn the Phase 0–1 spike into the real app. The OpenCode server survives the app being swiped away, restarts after a crash and stops when idle. The UI is a native shell: onboarding, setup, a Home with recent sessions and search, a Files manager, a Terminal, and Settings (with Environment). The chat itself is the OpenCode web UI in a WebView, opened directly on a chosen session.
 
-**Architecture:** All lifecycle policy is plain Kotlin behind small interfaces and is unit-tested on the JVM with a fake clock. These are `ServerController`, `TerminalManager`, `MemoryGuard` and `EnvironmentManager`. A process-wide `RuntimeHost` owns them. A foreground `RuntimeService` only exists to keep the process alive while the server runs; it holds no logic. The Flutter plugin talks to `RuntimeHost`, so a new Flutter engine can re-attach to a server that is already running. The Dart UI depends on an abstract `RuntimeApi`, so every screen is tested with a fake.
+**Architecture:** All lifecycle policy is plain Kotlin behind small interfaces and is unit-tested on the JVM with a fake clock. These are `ServerController`, `TerminalManager`, `MemoryGuard` and `EnvironmentManager`. A process-wide `RuntimeHost` owns them. A foreground `RuntimeService` only exists to keep the process alive while the server runs; it holds no logic. The Flutter plugin talks to `RuntimeHost`, so a new Flutter engine can re-attach to a server that is already running. The Dart UI depends on an abstract `RuntimeApi` (process control, terminal, files) and an abstract `OpencodeApi` (OpenCode's HTTP API: sessions, projects), so every screen is tested with fakes. Files are managed natively by a Kotlin `FileManager` working directly on `files/home` (guest `/root`), so it works with the server off.
 
 **Tech Stack:** Kotlin, JUnit4, Android `Service` (foregroundServiceType `specialUse`), Flutter 3.44 / Dart 3.12, `webview_flutter` (already in), `xterm` ^4.0.0, `shared_preferences` ^2.5.0.
 
@@ -22,17 +22,23 @@
 - Terminal: a PTY running `proot … /bin/bash -l` (`ProotLauncher` + `EnvBuilder`), multiple sessions, and an extra key row (Esc/Ctrl/Tab/arrows).
 - Environment tab: runtime versions, disk usage, a visible-PTY `apk add build-base`, and "reset environment" that keeps `/root`.
 - WebView rules from `app/lib/server_guard.dart` stay: localhost-only navigation, Basic auth answered only for our own server, external links go to the system browser.
+- Navigation: bottom bar **Home · Files · Terminal · Settings**. Chat is a full-screen page pushed from Home (back returns to Home). Environment is a page under Settings.
+- Chat = OpenCode web UI in the WebView (it already renders markdown, code, diffs, tool calls, permission prompts and provider login). Do not rebuild it natively in this plan.
+- Home history/search/new-session use OpenCode's own HTTP API. Confirm the exact routes against the running server's OpenAPI (`GET /doc`) in Task 6 Step 1 and record them in `docs/opencode-api.md`.
+- File manager is sandboxed to `files/home`: every path is resolved against that root and anything that escapes it is rejected. No `MANAGE_EXTERNAL_STORAGE`.
 - Onboarding shows a disclosure ("a Linux environment runs in this app's private sandbox, and the AI can run commands there") and needs consent before anything is installed or started.
 - JVM tests: `cd app/android && ./gradlew :opencode_runtime:testDebugUnitTest`. Dart tests: `cd app && flutter test`.
 
 ## Review Focus
-1. **App swiped from recents while the server runs.** The server keeps running. When the app reopens, the UI shows the existing server and does not start a second one. → Task 4 `RuntimeHost` is process-wide, and Task 6 `attachesToRunningServer`.
+1. **App swiped from recents while the server runs.** The server keeps running. When the app reopens, the UI shows the existing server and does not start a second one. → Task 4 `RuntimeHost` is process-wide, and Task 6 `chat_session_test` `attachesToRunningServer`.
 2. **A crash loop.** The server dies on every start. After 3 restarts the state is `failed` with the log tail, with no endless loop and no restart storm. → Task 1 `givesUpAfterMaxRestarts`.
 3. **Idle stop must not kill real work.** If a terminal is open, or OpenCode is mid-task with the app in the background, the idle timer must not fire. If the busy check itself fails, treat the server as busy. → Task 1 `idleNeverStopsWithTerminalOrBusyServer`, `busyProbeErrorCountsAsBusy`.
-4. **Restart changes port and password.** The WebView must reload on the new origin, not keep talking to the dead one. → Task 6 `reloadsWhenPortOrPasswordChanges`.
+4. **Restart changes port and password.** The WebView must reload on the new origin, not keep talking to the dead one. → Task 6 `chat_session_test` `reloadsWhenPortOrPasswordChanges`.
 5. **Terminal edge cases.** Resize to 0×0 or a huge size, writing to a session that already exited, and output arriving after close. → Task 2 `clampsResize`, `writeAfterExitIsIgnored`.
 6. **Reset environment while things are running**, or with the app killed halfway. It must refuse while the server or a terminal is active, and must never touch `/root`. → Task 3 `refusesWhileBusy`, `keepsHome`.
-7. **Notification permission denied** (Android 13+). The server must still run and onboarding must not block. → Task 5 `deniedNotificationsDoNotBlock`.
+7. **File manager escapes the sandbox** (`..`, symlinks to outside, absolute paths) or deletes `/root`. → Task 3b `rejectsTraversal`, `rejectsSymlinkEscape`, `deleteRefusesRoot`.
+8. **Search typing storm and odd titles** (empty titles, server offline while Home is open). → Task 6 `home_controller_test`.
+9. **Notification permission denied** (Android 13+). The server must still run and onboarding must not block. → Task 5 `deniedNotificationsDoNotBlock`.
 
 ---
 
@@ -42,13 +48,14 @@ packages/opencode_runtime/android/src/main/kotlin/dev/opencodeapk/runtime/
   ServerController.kt     state machine: start/stop, crash restart, idle stop, state snapshots (pure, fake-clock tested)
   TerminalManager.kt      PTY sessions by id, attached tracking, clamped resize
   MemoryGuard.kt          onTrimMemory policy
-  EnvironmentManager.kt   info() and reset() for the Environment tab
+  EnvironmentManager.kt   info() and reset() for the Environment page
+  FileManager.kt          sandboxed file operations on /root
   RuntimeHost.kt          process-wide singleton wiring the above + a 1 s ticker
   RuntimeService.kt       foreground service + notification (Stop action)
   OpencodeRuntimePlugin.kt  (modify) channels delegate to RuntimeHost
   ServerSupervisor.kt     (modify) implements ServerBackend
 packages/opencode_runtime/android/src/test/kotlin/dev/opencodeapk/runtime/
-  ServerControllerTest.kt, TerminalManagerTest.kt, MemoryGuardTest.kt, EnvironmentManagerTest.kt
+  ServerControllerTest.kt, TerminalManagerTest.kt, MemoryGuardTest.kt, EnvironmentManagerTest.kt, FileManagerTest.kt
 packages/opencode_runtime/lib/opencode_runtime.dart   RuntimeApi, OpencodeRuntime, ServerSnapshot, TerminalSession
 app/lib/
   main.dart                       runApp(OpencodeApp(runtime: OpencodeRuntime(), prefs: …))
@@ -57,11 +64,14 @@ app/lib/
   onboarding/onboarding_screen.dart
   setup/setup_controller.dart, setup/setup_screen.dart
   shell/home_shell.dart           NavigationBar + IndexedStack (keeps the WebView alive)
-  opencode_web/opencode_session.dart, opencode_web/opencode_tab.dart, server_guard.dart (kept)
+  api/opencode_api.dart, api/session.dart   OpenCode HTTP client (sessions, projects)
+  home/home_controller.dart, home/home_tab.dart   recent sessions + search + new session
+  chat/chat_session.dart, chat/chat_page.dart     server lifecycle for the app + WebView on a session; server_guard.dart (kept)
+  files/files_controller.dart, files/files_tab.dart, files/file_editor_page.dart
   terminal/key_bytes.dart, terminal/extra_keys.dart, terminal/terminal_tab.dart
-  environment/environment_tab.dart
+  environment/environment_page.dart
   settings/settings_tab.dart
-app/test/   key_bytes_test, settings_store_test, setup_controller_test, opencode_session_test, app_gate_test
+app/test/   key_bytes_test, settings_store_test, setup_controller_test, opencode_api_test, home_controller_test, chat_session_test, files_controller_test, tabs_test, app_gate_test
 app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
 ```
 
@@ -166,6 +176,31 @@ app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
 - [ ] **Step 2:** Run. Expected: FAIL. **Step 3:** Implement (walk the tree for sizes; skip symlinks). **Step 4:** Run. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(runtime): environment info and reset`.
 
+### Task 3b: FileManager (native, sandboxed to /root)
+
+**Files:** Create `FileManager.kt`. Test: `FileManagerTest.kt`. Wired to the plugin in Task 4.
+
+**Interfaces:**
+- Consumes: `Paths.home`.
+- Produces:
+  ```kotlin
+  data class FileEntry(val name: String, val path: String, val isDir: Boolean, val size: Long, val modifiedMs: Long)
+  class FileManager(private val home: File) {   // paths are guest paths: "/root", "/root/projects/a.py"
+      fun list(path: String): List<FileEntry>          // folders first, then files, each case-insensitive alphabetical
+      fun mkdir(path: String); fun createFile(path: String)
+      fun rename(path: String, newName: String)        // newName must not contain '/'
+      fun delete(path: String)                         // recursive; refuses "/root" itself
+      fun copy(src: String, dstDir: String); fun move(src: String, dstDir: String)
+      fun readText(path: String, maxBytes: Long = 1_048_576): String   // throws if larger, or if binary (NUL byte in first 8 KB)
+      fun writeText(path: String, text: String)        // atomic: temp file + rename
+  }
+  ```
+  Every method resolves its guest path against `home` and throws `SecurityException` if the canonical result is outside `home` (covers `..`, absolute paths outside `/root`, and symlinks that point outside).
+
+- [ ] **Step 1: Write failing tests** (temp dir as `home`): `listsFoldersFirstThenFiles`; `rejectsTraversal` (`/root/../x`, `/etc/passwd`, `/root/../../x`); `rejectsSymlinkEscape` (a symlink inside home to a file outside: `readText`, `writeText`, `delete` throw `SecurityException`; skip where the OS cannot create symlinks); `deleteRefusesRoot`; `renameRejectsSlashAndExistingName`; `copyAndMoveIntoSubfolder` (copying a folder into itself throws); `readTextRejectsBinaryAndOversize`; `writeTextReplacesContent`; `emptyPathMeansRoot`.
+- [ ] **Step 2:** Run `--tests '*FileManagerTest*'`. Expected: FAIL. **Step 3:** Implement. **Step 4:** Run. Expected: PASS.
+- [ ] **Step 5: Commit** `feat(runtime): sandboxed file manager`.
+
 ### Task 4: RuntimeHost + RuntimeService + plugin channels
 
 **Files:** Create `RuntimeHost.kt`, `RuntimeService.kt`. Modify `OpencodeRuntimePlugin.kt`, `packages/opencode_runtime/android/src/main/AndroidManifest.xml` (service declaration with the special-use property), `packages/opencode_runtime/lib/opencode_runtime.dart`. There are no JVM tests for the Android glue; it is verified on a device in Task 9.
@@ -173,10 +208,10 @@ app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
 **Interfaces:**
 - Consumes: Tasks 1–3.
 - Produces `object RuntimeHost`:
-  - `fun get(context: Context): RuntimeHost` lazily builds Paths, `ServerSupervisor`, `ServerController` (with `sessions = terminals::count`, and `busy` = the Step 1 probe), `TerminalManager`, `EnvironmentManager` and a single-thread 1 s `ScheduledExecutorService` that calls `controller.tick()`. It is created once per process.
+  - `fun get(context: Context): RuntimeHost` lazily builds Paths, `ServerSupervisor`, `ServerController` (with `sessions = terminals::count`, and `busy` = the Step 1 probe), `TerminalManager`, `EnvironmentManager`, `FileManager` and a single-thread 1 s `ScheduledExecutorService` that calls `controller.tick()`. It is created once per process.
   - `fun addListener(l: HostListener)` / `removeListener`, where `HostListener` gets `onServerState(ServerSnapshot)`, `onTerminalOutput(id, bytes)` and `onTerminalExit(id, code)`. The listener list is `CopyOnWriteArrayList`, so a new Flutter engine can re-attach.
   - `RuntimeService`: `startForeground` with a low-importance channel `runtime`, title "OpenCode is running", text "Private Linux sandbox on this device" and a "Stop" action. The service starts when the state becomes `RUNNING` and stops when it becomes `STOPPED` or `FAILED`.
-- MethodChannel `opencode_runtime` adds: `serverSnapshot`, `setClients{n}`, `setIdleTimeoutMinutes{minutes}`, `terminalOpen{rows,cols,command?} -> id`, `terminalWrite{id,bytes}`, `terminalResize{id,rows,cols}`, `terminalClose{id}`, `environmentInfo`, `resetEnvironment`. `startServer` and `stopServer` now call the controller. New EventChannels:
+- MethodChannel `opencode_runtime` adds: `serverSnapshot`, `setClients{n}`, `setIdleTimeoutMinutes{minutes}`, `terminalOpen{rows,cols,command?} -> id`, `fileList{path}`, `fileMkdir`, `fileCreate`, `fileRename{path,newName}`, `fileDelete`, `fileCopy{src,dstDir}`, `fileMove{src,dstDir}`, `fileReadText{path}`, `fileWriteText{path,text}` (all delegate to `FileManager`; a `SecurityException` becomes a PlatformException with code `outside_sandbox`), `terminalWrite{id,bytes}`, `terminalResize{id,rows,cols}`, `terminalClose{id}`, `environmentInfo`, `resetEnvironment`. `startServer` and `stopServer` now call the controller. New EventChannels:
   - `opencode_runtime/state`: emits a map `{state, port, password, error, logTail, stopReason}` on every change, and the current one first on listen.
   - `opencode_runtime/terminal`: one stream per terminal id, with the id passed as the listen `arguments`. It emits `Uint8List` chunks, then ends on exit. Its `onListen`/`onCancel` call `setAttached`.
 - Dart (`opencode_runtime.dart`):
@@ -198,6 +233,7 @@ app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
     Future<EnvironmentInfo> environmentInfo();
     Future<void> resetEnvironment();
   }
+  // plus: Future<List<FileEntry>> listFiles(String path); mkdir, createFile, rename, deleteFile, copyFile, moveFile; Future<String> readText(path); writeText(path, text)
   class OpencodeRuntime implements RuntimeApi { … }
   ```
   `startServer` no longer returns `({int port, String password})`; callers move to `ServerSnapshot`.
@@ -239,34 +275,43 @@ app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
 - [ ] **Step 3:** Implement. `main.dart` is `WidgetsFlutterBinding.ensureInitialized()`, load prefs, `runApp`. Add the Android-side `requestNotificationPermission` method to the plugin (uses `ActivityAware` to get the activity, and returns immediately when SDK < 33).
 - [ ] **Step 4:** Run `flutter test`. Expected: PASS. **Step 5: Commit** `feat(app): onboarding, consent and setup flow`.
 
-### Task 6: Home shell + OpenCode tab
+### Task 6: OpencodeApi + Home (recent sessions, search) + Chat page
 
-**Files:** Create `shell/home_shell.dart`, `opencode_web/opencode_session.dart`, `opencode_web/opencode_tab.dart`. Keep `server_guard.dart` and its test. Test: `opencode_session_test.dart`.
+**Files:** Create `app/lib/api/opencode_api.dart`, `app/lib/api/session.dart`, `app/lib/home/home_controller.dart`, `app/lib/home/home_tab.dart`, `app/lib/chat/chat_page.dart`, `app/lib/chat/chat_session.dart`, `app/lib/shell/home_shell.dart`, `docs/opencode-api.md`. Keep `server_guard.dart` and its test. Tests: `opencode_api_test.dart`, `home_controller_test.dart`, `chat_session_test.dart`.
 
 **Interfaces:**
-- Consumes: `RuntimeApi`, `ServerSnapshot`, `isOwnServer`, `shouldAnswerAuth`.
+- Consumes: `RuntimeApi.serverState/startServer/setClients`, `isOwnServer`, `shouldAnswerAuth`.
 - Produces:
   ```dart
-  class OpencodeSession extends ChangeNotifier {
-    OpencodeSession(RuntimeApi runtime, {required bool Function() isForeground});
-    ServerSnapshot get snapshot;
-    Uri? get url;                // http://127.0.0.1:<port>/ while running, else null
-    int get generation;          // increments whenever (port, password) changes
-    Future<void> ensureRunning();   // start unless starting/running/restarting
-    Future<void> retry();
+  class SessionInfo { final String id; final String title; final String? directory; final DateTime updated; }
+  abstract class OpencodeApi {
+    Future<List<SessionInfo>> listSessions({String? search, int limit = 50});   // newest first
+    Future<SessionInfo> createSession({required String directory, String? title});
+    Future<void> renameSession(String id, String title);
+    Future<void> deleteSession(String id);
+    Future<List<String>> listProjects();                                          // known project directories
+  }
+  class HttpOpencodeApi implements OpencodeApi { HttpOpencodeApi({required Uri base, required String password, HttpClient? client}); }
+  class HomeController extends ChangeNotifier {
+    HomeController(OpencodeApi? Function() api, {Duration debounce = const Duration(milliseconds: 300), DateTime Function()? now});
+    List<SessionGroup> get groups;  // Today / Yesterday / This week / Older, each newest first
+    String get query; void setQuery(String q); Future<void> refresh(); bool get loading; String? get error;
+  }
+  Uri chatUrl(Uri base, SessionInfo s);   // deep link into the web UI for that session
+  class ChatSession extends ChangeNotifier { /* owns the server lifecycle for the app */
+    ChatSession(RuntimeApi runtime, {required bool Function() isForeground});
+    ServerSnapshot get snapshot; Uri? get base; int get generation; Future<void> ensureRunning(); Future<void> retry();
   }
   ```
-  `HomeShell` has a `NavigationBar` with OpenCode, Terminal, Environment and Settings, in an `IndexedStack`. It reports `runtime.setClients(1)` while the app is resumed and `setClients(0)` when it is paused or detached (`WidgetsBindingObserver`).
+  `HomeShell` has a `NavigationBar` (Home, Files, Terminal, Settings) in an `IndexedStack` and reports `runtime.setClients(1)` while the app is resumed and `setClients(0)` when paused or detached. Home shows: a search field, a "New session" button (project picker from `listProjects` plus "New project folder" which creates `/root/projects/<name>` through the file manager), and the grouped recent list. Tapping a session pushes `ChatPage`.
 
-- [ ] **Step 1: Write failing tests** (FakeRuntime with a controllable `serverState` stream):
-  - `attachesToRunningServer`: the first snapshot is `running` on port 4100. `ensureRunning()` does not call `startServer`, and `url` is `http://127.0.0.1:4100/`.
-  - `startsWhenStopped`: the first snapshot is `stopped`. `ensureRunning()` calls `startServer` once.
-  - `restartsAfterIdleStop`: `running`, then `stopped(stopReason: 'idle')`. With `isForeground() == true`, the session calls `startServer` again. When `isForeground() == false` it does not.
-  - `userStopIsNotRestarted`: `stopped(stopReason: 'user')` does not auto-start.
-  - `reloadsWhenPortOrPasswordChanges`: `running(4100, 'a')`, then `running(4207, 'b')` increments `generation` and `url` points at 4207. A repeated identical snapshot does not increment it.
-  - `failedExposesLogTail`: `failed` keeps `error` and `logTail` for the error view, and `retry()` calls `startServer`.
-- [ ] **Step 2:** Run. Expected: FAIL. **Step 3:** Implement. The tab keeps one `WebViewController`. It creates a new one only when `generation` changes, using the navigation and auth rules from `server_guard.dart`. `onNavigationRequest` sends non-own-server `http(s)` URLs to the system browser. Add `url_launcher` to `pubspec.yaml`. The tab shows a progress view while `starting`/`restarting`, and an error view with the log and a Retry button on `failed`.
-- [ ] **Step 4:** Run. Expected: PASS. **Step 5: Commit** `feat(app): home shell and OpenCode tab with server session`.
+- [ ] **Step 1: Read the real API.** Start the server on the emulator, fetch `/doc` with Basic auth, and write the routes this task uses (list/search/create/rename/delete sessions, projects, how the project directory is passed, and the web UI route that opens a session) into `docs/opencode-api.md`. Adjust the interface above to match; if the server has no search parameter, `HttpOpencodeApi` filters client-side on title.
+- [ ] **Step 2: Write failing tests:**
+  - `opencode_api_test` (local fake `HttpServer`): sends Basic auth `opencode:<pw>`; `listSessions` parses the fixture JSON newest first and passes `search`/`limit`; `deleteSession` and `renameSession` hit the right method and path; a 401 throws `OpencodeApiException`; a non-JSON body throws `OpencodeApiException`, not `FormatException`.
+  - `home_controller_test`: groups by Today/Yesterday/This week/Older using an injected `now`; an empty title shows as "Untitled session"; `setQuery('x')` triggers one `listSessions(search: 'x')` after the debounce, not one per keystroke; a failed refresh sets `error` and keeps the previous list; with the server not running (`api()` returns null) the list is empty and `error` is null.
+  - `chat_session_test`: `attachesToRunningServer`, `startsWhenStopped`, `restartsAfterIdleStop` (only when `isForeground()`), `userStopIsNotRestarted`, `reloadsWhenPortOrPasswordChanges` (generation increments only on change), `failedExposesLogTail`; plus `chatUrl` for a session whose directory contains spaces and `/`.
+- [ ] **Step 3:** Run `flutter test`. Expected: FAIL. **Step 4:** Implement. `ChatPage` keeps one `WebViewController` per `generation`, uses the navigation and auth rules from `server_guard.dart`, sends non-own-server `http(s)` links to the system browser (add `url_launcher`), and shows a progress view while `starting`/`restarting` and an error view with log and Retry on `failed`. Use `dart:io` `HttpClient` (no new dependency).
+- [ ] **Step 5:** Run `flutter test` and `flutter analyze`. Expected: PASS and clean. **Step 6: Commit** `feat(app): opencode api client, home with history and search, chat page`.
 
 ### Task 7: Terminal tab
 
@@ -285,18 +330,20 @@ app/android/app/src/main/AndroidManifest.xml   (modify) service declaration
 - [ ] **Step 2:** Run. Expected: FAIL. **Step 3:** Implement the key functions, then the widgets with `xterm`'s `Terminal` and `TerminalView`. Pipe `session.output` into `terminal.write(utf8.decode(bytes, allowMalformed: true))`, and `terminal.onOutput` into `session.write`. Closing a tab calls `session.close()`. When the process exits, show "[process exited]" and a "Restart" button.
 - [ ] **Step 4:** Run `flutter test` and `flutter analyze`. Expected: PASS and clean. **Step 5: Commit** `feat(app): terminal tab with extra keys`.
 
-### Task 8: Environment tab + Settings tab
+### Task 8: Files tab + Environment and Settings pages
 
-**Files:** Create `environment/environment_tab.dart`, `settings/settings_tab.dart`. Tests: add widget tests to `app_gate_test.dart`, or create `tabs_test.dart`.
+**Files:** Create `files/files_tab.dart`, `files/file_editor_page.dart`, `files/files_controller.dart`, `settings/settings_tab.dart`, `environment/environment_page.dart`. Tests: `files_controller_test.dart`, `tabs_test.dart`.
 
 **Interfaces:**
-- Consumes: `RuntimeApi.environmentInfo()`, `resetEnvironment()`, `openTerminal(command:)`, `selfTest()`, `serverLog()`, `stopServer()`, `SettingsStore`.
+- Consumes: `RuntimeApi` file methods (Task 4), `environmentInfo()`, `resetEnvironment()`, `openTerminal(command:)`, `selfTest()`, `serverLog()`, `stopServer()`, `SettingsStore`.
+- Produces `FilesController extends ChangeNotifier` (`FilesController(RuntimeApi)`: `path`, `entries`, `open(String dir)`, `up()`, `refresh()`, `createFolder`, `createFile`, `rename`, `delete`, `copy`, `move`, `selection` set with `toggle`, `paste()`, `error`).
 - Behaviour:
-  - Environment tab: the self-test versions (node, python, opencode, arch). Rootfs and `/root` sizes in MB. One-tap "Install build tools" opens the Terminal with `command: ['/bin/sh','-c','apk add build-base && echo build-base >> /root/.apk-extra']` and switches to the Terminal tab, so the user sees every command. "Reset environment" is behind a confirm dialog that says `/root` is kept. It calls `stopServer()`, then `resetEnvironment()`, then returns to the Setup flow. If `extraPackages` is not empty after a reset, a "Restore N extra packages" button runs `apk add $(cat /root/.apk-extra)` in the Terminal.
-  - Settings tab: idle timeout (steps 5, 15, 30, 60 min, calls `setIdleMinutes` and `runtime.setIdleTimeoutMinutes`), "Server log" (bottom sheet from `serverLog()`), "Stop server now", app version and the bundled OpenCode version (from `selfTest`), and a link to the licenses page (`showLicensePage`).
+  - Files tab: breadcrumb starting at `/root`; folders first, then files, alphabetical; long-press selects (multi-select delete/copy/move); "+" menu: new folder, new file; tap a text file opens `FileEditorPage` (monospace editor, Save); binary or >1 MB files show size only; "New session here" on a folder opens Chat in that directory.
+  - Environment page: versions (node, python, opencode, arch), rootfs and `/root` sizes in MB, "Install build tools" runs `apk add build-base && echo build-base >> /root/.apk-extra` in the Terminal tab so every command is visible, "Reset environment" behind a confirm dialog that says `/root` is kept (calls `stopServer()`, then `resetEnvironment()`, then returns to Setup), and "Restore N extra packages" when `extraPackages` is not empty.
+  - Settings tab: idle timeout (5, 15, 30, 60 min), OpenCode config (read and write `/root/.config/opencode/opencode.json` through the file manager; plain JSON editor with validation), an API-keys note ("keys are entered in the OpenCode chat screen; secure storage comes later"), Server log (bottom sheet), Stop server now, Environment, app version, `showLicensePage`.
 
-- [ ] **Step 1: Write failing widget tests:** `shows versions and sizes from fake runtime`. `reset asks for confirmation and does nothing on cancel`. `reset confirmed calls stopServer then resetEnvironment in that order`. `build tools button opens a terminal with the apk command`. `idle timeout choice persists and is sent to runtime`.
-- [ ] **Step 2:** Run. Expected: FAIL. **Step 3:** Implement. **Step 4:** Run `flutter test`. Expected: PASS. **Step 5: Commit** `feat(app): environment and settings tabs`.
+- [ ] **Step 1: Write failing tests:** `files_controller_test`: opening a dir lists folders before files; `up()` at `/root` stays at `/root`; delete of a selection calls the runtime once per path and refreshes; an error from the runtime sets `error` and keeps the old listing. `tabs_test`: Settings idle choice persists and is sent to the runtime; reset asks for confirmation and does nothing on cancel; confirmed reset calls `stopServer` then `resetEnvironment` in that order; "Install build tools" opens a terminal with the apk command; invalid JSON in the config editor blocks Save.
+- [ ] **Step 2:** Run. Expected: FAIL. **Step 3:** Implement. **Step 4:** Run `flutter test`. Expected: PASS. **Step 5: Commit** `feat(app): files manager, environment and settings`.
 
 ### Task 9: On-device verification + docs
 
