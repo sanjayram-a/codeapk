@@ -62,6 +62,16 @@ class _FileEditorPageState extends State<FileEditorPage> {
     if (mounted) setState(() => _saving = false);
   }
 
+  Future<void> _download() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await widget.runtime.saveToDownloads(widget.path);
+      messenger.showSnackBar(const SnackBar(content: Text('Saved to Downloads')));
+    } on PlatformException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message ?? e.code)));
+    }
+  }
+
   @override
   void dispose() {
     _text.dispose();
@@ -101,7 +111,23 @@ class _FileEditorPageState extends State<FileEditorPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _loadError != null
-                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_loadError!)))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_loadError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: _download,
+                            icon: const Icon(Icons.download),
+                            label: const Text('Save to Downloads'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : Column(
                     children: [
                       if (_invalid != null)

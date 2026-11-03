@@ -9,6 +9,7 @@ import '../chat/chat_session.dart';
 import '../environment/environment_page.dart';
 import '../files/file_editor_page.dart';
 import '../shell/shell_controller.dart';
+import '../storage/storage_page.dart';
 
 const opencodeConfigPath = '/root/.config/opencode/opencode.json';
 const _configTemplate = '{\n  "\$schema": "https://opencode.ai/config.json"\n}\n';
@@ -166,6 +167,14 @@ class _SettingsTabState extends State<SettingsTab> {
                       shell: widget.shell,
                       onResetDone: widget.onResetDone,
                     ),
+                  )),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.storage),
+                  title: const Text('Storage & cache'),
+                  subtitle: const Text('npm and Python cache, size of each project'),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => StoragePage(runtime: _rt),
                   )),
                 ),
                 const _Section('About'),

@@ -180,6 +180,34 @@ class FakeRuntime implements RuntimeApi {
   @override
   Future<EnvironmentInfo> environmentInfo() async => env;
 
+  StorageInfo storage = const StorageInfo(npmBytes: 0, pythonBytes: 0, projects: []);
+  Completer<void>? storageGate;
+
+  @override
+  Future<StorageInfo> storageInfo() async {
+    await storageGate?.future;
+    return storage;
+  }
+
+  @override
+  Future<int> clearCache(CacheKind kind) async {
+    log.add('clearCache ${kind.name}');
+    final freed = kind == CacheKind.npm ? storage.npmBytes : storage.pythonBytes;
+    storage = StorageInfo(
+      npmBytes: kind == CacheKind.npm ? 0 : storage.npmBytes,
+      pythonBytes: kind == CacheKind.python ? 0 : storage.pythonBytes,
+      projects: storage.projects,
+    );
+    return freed;
+  }
+
+  @override
+  Future<String> saveToDownloads(String path) async {
+    log.add('download $path');
+    if (fileError != null) throw fileError!;
+    return path.split('/').last;
+  }
+
   @override
   Future<void> resetEnvironment() async => log.add('resetEnvironment');
 }

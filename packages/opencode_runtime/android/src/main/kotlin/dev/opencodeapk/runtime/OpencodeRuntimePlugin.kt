@@ -4,7 +4,11 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.ContentValues
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import android.os.Handler
 import android.os.Looper
 import com.github.luben.zstd.ZstdInputStream
@@ -173,6 +177,18 @@ class OpencodeRuntimePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ac
                 )
             }
             "resetEnvironment" -> background(result) { host.environment.reset(); null }
+            "storageInfo" -> background(result) {
+                val i = host.environment.storageInfo()
+                mapOf(
+                    "npmBytes" to i.npmBytes, "pythonBytes" to i.pythonBytes,
+                    "projects" to i.projects.map { mapOf("name" to it.name, "path" to it.path, "bytes" to it.bytes) },
+                )
+            }
+            "clearCache" -> background(result) {
+                val kind = CacheKind.valueOf(call.argument<String>("kind")!!.uppercase())
+                host.environment.clearCache(kind)
+            }
+            "saveToDownloads" -> background(result) { saveToDownloads(call.argument<String>("path")!!) }
             else -> result.notImplemented()
         }
     }
@@ -194,6 +210,30 @@ class OpencodeRuntimePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ac
                 main.post { result.error(e.javaClass.simpleName, e.message, null) }
             }
         }
+    }
+
+    /** Copies a sandbox file into the phone's public Downloads folder. Returns the name it was saved under. */
+    private fun saveToDownloads(guestPath: String): String {
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { "Saving to Downloads needs Android 10 or newer" }
+        val source = host.fileManager.regularFile(guestPath)
+        val ext = source.extension.lowercase()
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, source.name)
+            put(MediaStore.Downloads.MIME_TYPE, MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw java.io.IOException("cannot create the file in Downloads")
+        try {
+            resolver.openOutputStream(uri)!!.use { out -> source.inputStream().use { it.copyTo(out) } }
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+        return source.name
     }
 
     /** Runs one shell line through proot and returns one value per probe. */

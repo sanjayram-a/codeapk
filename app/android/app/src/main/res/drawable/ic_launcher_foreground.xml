@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same artwork as docs/app-icon.svg, drawn in the 512-unit space. It spans about half the canvas, inside the
+     adaptive-icon safe zone (the centre 66 of 108 dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path
+        android:pathData="M150,172 L246,256 L150,340"
+        android:strokeWidth="42"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="150"
+                android:startY="172"
+                android:endX="246"
+                android:endY="340"
+                android:startColor="#5CF0B0"
+                android:endColor="#2FC4F2" />
+        </aapt:attr>
+    </path>
+    <path
+        android:pathData="M282,344 L372,344"
+        android:strokeColor="#E6EDF3"
+        android:strokeWidth="42"
+        android:strokeLineCap="round" />
+</vector>

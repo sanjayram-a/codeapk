@@ -1,4 +1,4 @@
-package dev.opencodeapk.app
+package com.opencode.dotwellabs
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -101,6 +101,37 @@ class EnvironmentInfo {
       );
 }
 
+enum CacheKind { npm, python }
+
+/// A folder in `/root/projects` and the space it uses.
+class ProjectSize {
+  const ProjectSize({required this.name, required this.path, required this.bytes});
+
+  final String name;
+  final String path;
+  final int bytes;
+
+  factory ProjectSize.fromMap(Map<Object?, Object?> m) =>
+      ProjectSize(name: m['name'] as String, path: m['path'] as String, bytes: (m['bytes'] as num).toInt());
+}
+
+/// Package-cache sizes and per-project sizes. Calculating them can take a while on big projects.
+class StorageInfo {
+  const StorageInfo({required this.npmBytes, required this.pythonBytes, required this.projects});
+
+  final int npmBytes;
+  final int pythonBytes;
+
+  /// Largest first.
+  final List<ProjectSize> projects;
+
+  factory StorageInfo.fromMap(Map<Object?, Object?> m) => StorageInfo(
+        npmBytes: (m['npmBytes'] as num).toInt(),
+        pythonBytes: (m['pythonBytes'] as num).toInt(),
+        projects: [for (final p in m['projects'] as List? ?? const []) ProjectSize.fromMap(p as Map<Object?, Object?>)],
+      );
+}
+
 /// An interactive shell (or one command) running on a pseudo-terminal in the sandbox.
 abstract class TerminalSession {
   /// Raw terminal output. Ends when the process exits.
@@ -155,6 +186,16 @@ abstract class RuntimeApi {
   Future<void> writeText(String path, String text);
 
   Future<EnvironmentInfo> environmentInfo();
+
+  /// Cache sizes and the size of each project folder.
+  Future<StorageInfo> storageInfo();
+
+  /// Deletes the downloaded-package cache of [kind] (never project files). Returns the bytes freed.
+  Future<int> clearCache(CacheKind kind);
+
+  /// Copies a sandbox file into the phone's public Downloads folder. Returns the file name it was saved under.
+  /// Fails with code `state` before Android 10.
+  Future<String> saveToDownloads(String path);
 
   /// Deletes the Linux system (not `/root`). Fails with code `busy` while the server or a terminal is running.
   Future<void> resetEnvironment();
@@ -241,6 +282,15 @@ class OpencodeRuntime implements RuntimeApi {
   @override
   Future<EnvironmentInfo> environmentInfo() async =>
       EnvironmentInfo.fromMap((await _call<Map>('environmentInfo'))!);
+
+  @override
+  Future<StorageInfo> storageInfo() async => StorageInfo.fromMap((await _call<Map>('storageInfo'))!);
+
+  @override
+  Future<int> clearCache(CacheKind kind) async => (await _call<num>('clearCache', {'kind': kind.name}))?.toInt() ?? 0;
+
+  @override
+  Future<String> saveToDownloads(String path) async => (await _call<String>('saveToDownloads', {'path': path}))!;
 
   @override
   Future<void> resetEnvironment() => _call<void>('resetEnvironment');

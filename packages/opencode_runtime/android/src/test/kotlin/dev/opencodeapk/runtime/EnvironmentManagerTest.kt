@@ -71,6 +71,44 @@ internal class EnvironmentManagerTest {
     }
 
     @Test
+    fun storageInfoSizesCachesAndProjectsLargestFirst() {
+        file(File(paths.home, ".npm/_cacache/a"), "x".repeat(30))
+        file(File(paths.home, ".cache/node-compile/b"), "x".repeat(5))
+        file(File(paths.home, ".cache/pip/c"), "x".repeat(20))
+        file(File(paths.home, ".cache/uv/d"), "x".repeat(2))
+        file(File(paths.home, "projects/small/a.py"), "x".repeat(10))
+        file(File(paths.home, "projects/big/node_modules/m.js"), "x".repeat(500))
+        file(File(paths.home, "projects/loose.txt"), "ignored: not a folder")
+        val info = manager.storageInfo()
+        assertEquals(35L, info.npmBytes)
+        assertEquals(22L, info.pythonBytes)
+        assertEquals(listOf("big", "small"), info.projects.map { it.name })
+        assertEquals(listOf(500L, 10L), info.projects.map { it.bytes })
+        assertEquals("/root/projects/big", info.projects.first().path)
+    }
+
+    @Test
+    fun storageInfoWithNothingThere() {
+        val info = manager.storageInfo()
+        assertEquals(0L, info.npmBytes)
+        assertEquals(0L, info.pythonBytes)
+        assertEquals(emptyList(), info.projects)
+    }
+
+    @Test
+    fun clearCacheOnlyRemovesThatKindAndReportsBytesFreed() {
+        file(File(paths.home, ".npm/_cacache/a"), "x".repeat(30))
+        file(File(paths.home, ".cache/pip/c"), "x".repeat(20))
+        file(File(paths.home, "projects/app/node_modules/m.js"), "keep")
+        assertEquals(30L, manager.clearCache(CacheKind.NPM))
+        assertFalse(File(paths.home, ".npm").exists())
+        assertTrue(File(paths.home, ".cache/pip/c").exists())
+        assertEquals(20L, manager.clearCache(CacheKind.PYTHON))
+        assertEquals(0L, manager.clearCache(CacheKind.PYTHON)) // already empty: no error
+        assertEquals("keep", File(paths.home, "projects/app/node_modules/m.js").readText())
+    }
+
+    @Test
     fun refusesWhileBusy() {
         file(File(paths.rootfs, "bin/sh"), "x")
         busy = true

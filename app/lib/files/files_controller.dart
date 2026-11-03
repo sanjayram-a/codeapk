@@ -74,6 +74,29 @@ class FilesController extends ChangeNotifier {
     });
   }
 
+  /// True when every selected item is a file (folders cannot be downloaded).
+  bool get selectionDownloadable =>
+      _selection.isNotEmpty && _entries.where((e) => _selection.contains(e.path)).every((e) => !e.isDir);
+
+  /// Saves the selected files to the phone's Downloads folder. Returns how many were saved; on failure the error is
+  /// shown in the Files banner and the files saved so far are still counted.
+  Future<int> downloadSelection() async {
+    final paths = _selection.toList();
+    _selection.clear();
+    var saved = 0;
+    try {
+      for (final p in paths) {
+        await _runtime.saveToDownloads(p);
+        saved++;
+      }
+      _error = null;
+    } catch (e) {
+      _error = _describe(e);
+    }
+    notifyListeners();
+    return saved;
+  }
+
   void copySelection() => _setClipboard(cut: false);
 
   void cutSelection() => _setClipboard(cut: true);

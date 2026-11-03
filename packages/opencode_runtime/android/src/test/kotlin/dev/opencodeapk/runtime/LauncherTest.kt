@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 internal class LauncherTest {
-    private val paths = Paths(filesDir = File("/data/user/0/dev.opencodeapk.app/files"), nativeLibDir = File("/data/app/x/lib/arm64"))
+    private val paths = Paths(filesDir = File("/data/user/0/com.opencode.dotwellabs/files"), nativeLibDir = File("/data/app/x/lib/arm64"))
     private val lib = paths.nativeLibDir.path
 
     @Test
@@ -44,6 +44,7 @@ internal class LauncherTest {
             "LD_LIBRARY_PATH" to lib,
             "NODE_COMPILE_CACHE" to "/root/.cache/node-compile",
             "UV_CACHE_DIR" to "/root/.cache/uv",
+            "OPENCODE_CONFIG" to "/etc/opencode/opencode.json",
             "npm_config_prefer_offline" to "true",
             "PIP_PREFER_BINARY" to "1",
             "NODE_OPTIONS" to "--max-old-space-size=1024",
@@ -68,7 +69,7 @@ internal class LauncherTest {
         val env = EnvBuilder.build(paths)
         val allowed = setOf(
             "HOME", "PATH", "TMPDIR", "LANG", "TERM", "PROOT_LOADER", "PROOT_TMP_DIR", "LD_LIBRARY_PATH",
-            "NODE_COMPILE_CACHE", "UV_CACHE_DIR", "npm_config_prefer_offline", "PIP_PREFER_BINARY", "NODE_OPTIONS",
+            "NODE_COMPILE_CACHE", "UV_CACHE_DIR", "OPENCODE_CONFIG", "npm_config_prefer_offline", "PIP_PREFER_BINARY", "NODE_OPTIONS",
         )
         val leaked = System.getenv().keys.filter { it in env && it !in allowed }
         assertEquals(emptyList(), leaked)

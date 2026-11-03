@@ -159,6 +159,18 @@ class _FilesTabState extends State<FilesTab> {
             if (n != null) await _c.rename(single, n);
           },
         ),
+      if (_c.selectionDownloadable)
+        IconButton(
+          icon: const Icon(Icons.download),
+          tooltip: 'Save to Downloads',
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final n = await _c.downloadSelection();
+            if (n > 0) {
+              messenger.showSnackBar(SnackBar(content: Text(n == 1 ? 'Saved to Downloads' : '$n files saved to Downloads')));
+            }
+          },
+        ),
       IconButton(icon: const Icon(Icons.copy), tooltip: 'Copy', onPressed: _c.copySelection),
       IconButton(icon: const Icon(Icons.content_cut), tooltip: 'Cut', onPressed: _c.cutSelection),
       IconButton(

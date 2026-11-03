@@ -89,6 +89,13 @@ class FileManager(home: File) {
         }
     }
 
+    /** The host file behind guest [path], checked to be a regular file inside the sandbox (for saving it elsewhere). */
+    fun regularFile(path: String): File {
+        val f = resolve(path)
+        require(f.isFile) { "not a file: $path" }
+        return f
+    }
+
     fun readText(path: String, maxBytes: Long = 1_048_576): String {
         val f = resolve(path)
         require(f.isFile) { "not a file: $path" }
