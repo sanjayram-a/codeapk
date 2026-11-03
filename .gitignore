@@ -14,3 +14,8 @@ out/
 native/proot/work/
 rootfs/work/
 app/android/app/src/main/assets/rootfs/
+
+# Local-only docs (kept on disk, not published)
+/README.md
+/AGENT.md
+/CONTEXT.md
