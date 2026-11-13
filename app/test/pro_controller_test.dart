@@ -219,4 +219,39 @@ void main() {
     expect(pro.status, ProStatus.pro);
     expect(pro.error, 'ack failed');
   });
+
+  test('a stream error clears the purchasing lockout', () async {
+    final g = FakeBillingGateway();
+    final pro = ProController(g, await settings());
+    await pro.initialize();
+    await pro.buy();
+    expect(pro.isPurchasing, isTrue);
+    expect(g.buyCalls, 1);
+
+    g.emitError(const BillingException('stream failed'));
+    await pumpEventQueue();
+
+    expect(pro.isPurchasing, isFalse);
+    expect(pro.isPro, isFalse);
+    expect(pro.error, 'stream failed');
+    await pro.buy();
+    expect(g.buyCalls, 2);
+  });
+
+  test('a stream error does not revoke cached pro', () async {
+    SharedPreferences.setMockInitialValues({
+      'pro_owned': true,
+      'pro_last_verified_at': DateTime.now().millisecondsSinceEpoch,
+    });
+    final g = FakeBillingGateway()..available = false;
+    final pro = ProController(g, await settings());
+    await pro.initialize();
+    expect(pro.isPro, isTrue);
+
+    g.emitError(const BillingException('stream failed'));
+    await pumpEventQueue();
+
+    expect(pro.isPro, isTrue);
+    expect(pro.error, 'stream failed');
+  });
 }

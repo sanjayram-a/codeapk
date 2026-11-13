@@ -209,12 +209,15 @@ class ProController extends ChangeNotifier {
 
   void _onPurchaseStreamError(Object error) {
     _error = _message(error);
+    _purchasing = false;
     if (!_owned) {
       _status = ProStatus.error;
     }
     _notify();
   }
 
+  /// Starts the purchase flow. [BillingGateway.buy] must emit a terminal
+  /// purchase event on the stream; that event clears [isPurchasing].
   Future<void> buy() async {
     if (_owned || _purchasing) return;
     final product = _product;

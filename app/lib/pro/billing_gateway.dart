@@ -46,6 +46,14 @@ abstract class BillingGateway {
   Stream<BillingPurchase> get purchaseStream;
   Future<List<BillingProduct>> queryProducts(Set<String> productIds);
   Future<List<BillingPurchase>> queryPurchases();
+
+  /// Starts the Play purchase flow for [productId].
+  ///
+  /// The gateway must emit a terminal [BillingPurchase] on [purchaseStream]
+  /// (`purchased`, `pending`, `canceled`, or `error`) for every purchase it
+  /// starts. [ProController] clears its purchasing lock from that event, not
+  /// from the completion of this future, so a successful completion without a
+  /// matching event would leave the controller locked.
   Future<void> buy(String productId);
   Future<void> acknowledge(String purchaseToken);
   Future<void> restore();

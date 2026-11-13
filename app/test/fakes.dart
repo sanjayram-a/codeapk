@@ -312,6 +312,8 @@ class FakeBillingGateway implements BillingGateway {
 
   void emit(BillingPurchase purchase) => _purchases.add(purchase);
 
+  void emitError(Object error) => _purchases.addError(error);
+
   @override
   Future<void> dispose() async {
     await _purchases.close();
