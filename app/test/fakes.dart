@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:opencode_app/api/opencode_api.dart';
+import 'package:opencode_app/pro/billing_gateway.dart';
 import 'package:opencode_runtime/opencode_runtime.dart';
 
 class FakeTerminal implements TerminalSession {
@@ -247,4 +248,72 @@ class FakeOpencodeApi implements OpencodeApi {
 
   @override
   Future<List<String>> listProjects() async => projects;
+}
+
+class FakeBillingGateway implements BillingGateway {
+  bool available = true;
+  BillingProduct? product = const BillingProduct(
+    id: proProductId,
+    title: 'OpenCode Pocket Pro',
+    description: 'Lifetime Pro',
+    price: '₹999',
+    rawPrice: 999,
+    currencyCode: 'INR',
+  );
+  List<BillingPurchase> purchases = const [];
+  Object? queryError;
+  Object? acknowledgeError;
+  Completer<void>? purchasesGate;
+  final _purchases = StreamController<BillingPurchase>.broadcast();
+  int queryProductCalls = 0;
+  int queryPurchaseCalls = 0;
+  int buyCalls = 0;
+  int restoreCalls = 0;
+  final bought = <String>[];
+  final acknowledged = <String>[];
+
+  @override
+  Future<bool> isAvailable() async => available;
+
+  @override
+  Stream<BillingPurchase> get purchaseStream => _purchases.stream;
+
+  @override
+  Future<List<BillingProduct>> queryProducts(Set<String> ids) async {
+    queryProductCalls++;
+    if (queryError != null) throw queryError!;
+    return product == null ? const [] : [product!];
+  }
+
+  @override
+  Future<List<BillingPurchase>> queryPurchases() async {
+    queryPurchaseCalls++;
+    await purchasesGate?.future;
+    if (queryError != null) throw queryError!;
+    return purchases;
+  }
+
+  @override
+  Future<void> buy(String productId) async {
+    buyCalls++;
+    bought.add(productId);
+  }
+
+  @override
+  Future<void> acknowledge(String purchaseToken) async {
+    if (acknowledgeError != null) throw acknowledgeError!;
+    acknowledged.add(purchaseToken);
+  }
+
+  @override
+  Future<void> restore() async {
+    restoreCalls++;
+  }
+
+  void emit(BillingPurchase purchase) => _purchases.add(purchase);
+
+  @override
+  Future<void> dispose() async {
+    await _purchases.close();
+  }
 }
