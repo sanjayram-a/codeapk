@@ -281,7 +281,8 @@ class _SettingsTabState extends State<SettingsTab> {
                   ),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => StoragePage(runtime: _rt),
+                      builder: (_) =>
+                          StoragePage(runtime: _rt, pro: widget.deps.pro),
                     ),
                   ),
                 ),
