@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opencode_app/app_deps.dart';
 import 'package:opencode_app/chat/chat_session.dart';
+import 'package:opencode_app/environment/command_task_page.dart';
 import 'package:opencode_app/environment/environment_page.dart';
 import 'package:opencode_app/files/file_editor_page.dart';
 import 'package:opencode_app/pro/billing_gateway.dart';
@@ -233,20 +234,21 @@ void main() {
       },
     );
 
-    testWidgets(
-      'install build tools runs the apk command in the terminal tab',
-      (tester) async {
-        await pumpEnv(tester);
-        await tester.tap(find.text('Install build tools'));
-        await tester.pumpAndSettle();
-        expect(shell.tab, ShellController.terminalTab);
-        expect(shell.takePendingCommand(), buildToolsCommand);
-        expect(buildToolsCommand.last, contains('apk add build-base'));
-        expect(buildToolsCommand.last, contains('/root/.apk-extra'));
-      },
-    );
+    testWidgets('install build tools opens the read-only task sheet', (
+      tester,
+    ) async {
+      await pumpEnv(tester);
+      await tester.tap(find.text('Install build tools'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CommandTaskPage), findsOneWidget);
+      expect(rt.log, contains('openTerminal ${buildToolsCommand.join(' ')}'));
+      expect(shell.tab, isNot(ShellController.terminalTab));
+      expect(find.byType(TextField), findsNothing);
+    });
 
-    testWidgets('extra packages can be restored', (tester) async {
+    testWidgets('extra packages restore in the read-only task sheet', (
+      tester,
+    ) async {
       rt.env = const EnvironmentInfo(
         rootfsBytes: 1024,
         homeBytes: 1024,
@@ -257,7 +259,11 @@ void main() {
       expect(find.text('Restore 2 extra package(s)'), findsOneWidget);
       await tester.tap(find.text('Restore 2 extra package(s)'));
       await tester.pumpAndSettle();
-      expect(shell.takePendingCommand(), restoreExtrasCommand);
+      expect(find.byType(CommandTaskPage), findsOneWidget);
+      expect(
+        rt.log,
+        contains('openTerminal ${restoreExtrasCommand.join(' ')}'),
+      );
     });
   });
 
