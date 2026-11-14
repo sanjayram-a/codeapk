@@ -116,6 +116,7 @@ class _SettingsTabState extends State<SettingsTab> {
         builder: (_) => FileEditorPage(
           runtime: _rt,
           path: opencodeConfigPath,
+          pro: widget.deps.pro,
           validate: validateConfigJson,
         ),
       ),

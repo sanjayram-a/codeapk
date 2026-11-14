@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:opencode_runtime/opencode_runtime.dart';
 
+import '../pro/paywall_page.dart';
+import '../pro/pro_controller.dart';
+import '../pro/pro_feature.dart';
 import '../shell/shell_controller.dart';
 import 'file_editor_page.dart';
 import 'files_controller.dart';
@@ -12,11 +15,13 @@ class FilesTab extends StatefulWidget {
     required this.runtime,
     required this.shell,
     required this.visible,
+    required this.pro,
   });
 
   final RuntimeApi runtime;
   final ShellController shell;
   final bool visible;
+  final ProController pro;
 
   @override
   State<FilesTab> createState() => _FilesTabState();
@@ -88,7 +93,11 @@ class _FilesTabState extends State<FilesTab> {
     if (e.isDir) return _c.open(e.path);
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => FileEditorPage(runtime: widget.runtime, path: e.path),
+        builder: (_) => FileEditorPage(
+          runtime: widget.runtime,
+          path: e.path,
+          pro: widget.pro,
+        ),
       ),
     );
     if (saved == true) _c.refresh();
@@ -238,6 +247,10 @@ class _FilesTabState extends State<FilesTab> {
           icon: const Icon(Icons.download),
           tooltip: 'Save to Downloads',
           onPressed: () async {
+            if (!widget.pro.isPro) {
+              await showPaywall(context, widget.pro, ProFeature.download);
+              return;
+            }
             final messenger = ScaffoldMessenger.of(context);
             final n = await _c.downloadSelection();
             if (n > 0) {

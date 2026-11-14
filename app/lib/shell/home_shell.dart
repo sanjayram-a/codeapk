@@ -161,6 +161,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             runtime: widget.deps.runtime,
             shell: _shell,
             visible: _shell.tab == ShellController.filesTab,
+            pro: widget.deps.pro,
           ),
           TerminalTab(
             runtime: widget.deps.runtime,

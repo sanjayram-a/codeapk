@@ -19,6 +19,7 @@ void main() {
   late FakeRuntime rt;
   late ShellController shell;
   late SettingsStore settings;
+  late ProController pro;
   ChatSession? chat;
   var resetDone = 0;
 
@@ -27,11 +28,16 @@ void main() {
     rt = FakeRuntime();
     shell = ShellController();
     settings = SettingsStore(await SharedPreferences.getInstance());
+    pro = ProController(FakeBillingGateway(), settings);
+    await pro.initialize();
     chat = null;
     resetDone = 0;
   });
 
-  tearDown(() => chat?.dispose());
+  tearDown(() {
+    chat?.dispose();
+    pro.dispose();
+  });
 
   Future<void> pumpSettings(WidgetTester tester, {bool isPro = true}) async {
     // created here, not in setUp, so its stream subscription lives in the test's own zone
@@ -274,6 +280,7 @@ void main() {
           home: FileEditorPage(
             runtime: rt,
             path: opencodeConfigPath,
+            pro: pro,
             validate: validateConfigJson,
           ),
         ),
@@ -307,6 +314,7 @@ void main() {
             home: FileEditorPage(
               runtime: _FailingRead(),
               path: '/root/big.bin',
+              pro: pro,
             ),
           ),
         );

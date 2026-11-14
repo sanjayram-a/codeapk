@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opencode_app/app_deps.dart';
+import 'package:opencode_app/files/file_editor_page.dart';
+import 'package:opencode_app/files/files_controller.dart';
+import 'package:opencode_app/files/files_tab.dart';
 import 'package:opencode_app/pro/billing_gateway.dart';
 import 'package:opencode_app/pro/pro_controller.dart';
 import 'package:opencode_app/settings/settings_store.dart';
 import 'package:opencode_app/shell/home_shell.dart';
 import 'package:opencode_app/shell/shell_controller.dart';
 import 'package:opencode_app/terminal/terminal_tab.dart';
+import 'package:opencode_runtime/opencode_runtime.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes.dart';
@@ -98,4 +103,94 @@ void main() {
     expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
     expect(rt.log.where((l) => l.startsWith('openTerminal')), isEmpty);
   });
+
+  final file = FileEntry(
+    name: 'report.pdf',
+    path: '/root/report.pdf',
+    isDir: false,
+    size: 10,
+    modified: DateTime(2026),
+  );
+
+  testWidgets('free files download opens the paywall and saves nothing', (
+    tester,
+  ) async {
+    final (rt, pro, _) = await makePro();
+    rt.listings = {
+      FilesController.root: [file],
+    };
+    final shell = ShellController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FilesTab(runtime: rt, shell: shell, visible: true, pro: pro),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('report.pdf'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Save to Downloads'));
+    await tester.pumpAndSettle();
+    expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
+    expect(rt.log, isNot(contains('download /root/report.pdf')));
+  });
+
+  testWidgets('pro files download saves the file', (tester) async {
+    final (rt, pro, _) = await makePro(owned: true);
+    rt.listings = {
+      FilesController.root: [file],
+    };
+    final shell = ShellController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FilesTab(runtime: rt, shell: shell, visible: true, pro: pro),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('report.pdf'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Save to Downloads'));
+    await tester.pumpAndSettle();
+    expect(rt.log, contains('download /root/report.pdf'));
+    expect(find.text('Get OpenCode Pocket Pro'), findsNothing);
+  });
+
+  testWidgets('free editor download opens the paywall', (tester) async {
+    final (_, pro, _) = await makePro();
+    final invalid = _InvalidReadRuntime();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FileEditorPage(runtime: invalid, path: '/root/big.bin', pro: pro),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save to Downloads'));
+    await tester.pumpAndSettle();
+    expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
+    expect(invalid.log, isEmpty);
+  });
+
+  testWidgets('pro editor download saves the file', (tester) async {
+    final (_, pro, _) = await makePro(owned: true);
+    final invalid = _InvalidReadRuntime();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FileEditorPage(runtime: invalid, path: '/root/big.bin', pro: pro),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save to Downloads'));
+    await tester.pumpAndSettle();
+    expect(invalid.log, contains('download /root/big.bin'));
+  });
+}
+
+class _InvalidReadRuntime extends FakeRuntime {
+  @override
+  Future<String> readText(String path) async {
+    throw PlatformException(code: 'invalid');
+  }
 }
