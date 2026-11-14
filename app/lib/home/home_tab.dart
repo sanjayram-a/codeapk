@@ -8,7 +8,13 @@ import 'home_controller.dart';
 
 /// Recent sessions grouped by day, with search; tap one to resume it in the chat.
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key, required this.controller, required this.chat, required this.shell, required this.runtime});
+  const HomeTab({
+    super.key,
+    required this.controller,
+    required this.chat,
+    required this.shell,
+    required this.runtime,
+  });
 
   final HomeController controller;
   final ChatSession chat;
@@ -80,7 +86,12 @@ class _HomeTabState extends State<HomeTab> {
               if (c.error != null && snap.isRunning)
                 MaterialBanner(
                   content: Text(c.error!),
-                  actions: [TextButton(onPressed: c.refresh, child: const Text('Retry'))],
+                  actions: [
+                    TextButton(
+                      onPressed: c.refresh,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
               Expanded(child: _list(context, c, snap)),
             ],
@@ -104,18 +115,26 @@ class _HomeTabState extends State<HomeTab> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: [
                     const SizedBox(height: 80),
-                    Icon(Icons.forum_outlined, size: 48, color: Theme.of(context).colorScheme.outline),
+                    Icon(
+                      Icons.forum_outlined,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                     const SizedBox(height: 12),
                     Center(
                       child: Text(
-                        c.query.isNotEmpty ? 'No sessions match "${c.query}"' : 'No sessions yet',
+                        c.query.isNotEmpty
+                            ? 'No sessions match "${c.query}"'
+                            : 'No sessions yet',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
                     if (c.query.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(8),
-                        child: Center(child: Text('Start one with the button below.')),
+                        child: Center(
+                          child: Text('Start one with the button below.'),
+                        ),
                       ),
                   ],
                 )
@@ -125,9 +144,17 @@ class _HomeTabState extends State<HomeTab> {
                     for (final g in groups) ...[
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                        child: Text(g.label, style: Theme.of(context).textTheme.labelLarge),
+                        child: Text(
+                          g.label,
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
                       ),
-                      for (final s in g.sessions) _SessionTile(session: s, controller: c, shell: widget.shell),
+                      for (final s in g.sessions)
+                        _SessionTile(
+                          session: s,
+                          controller: c,
+                          shell: widget.shell,
+                        ),
                     ],
                   ],
                 ),
@@ -136,6 +163,7 @@ class _HomeTabState extends State<HomeTab> {
           right: 16,
           bottom: 16,
           child: FloatingActionButton.extended(
+            heroTag: 'home-new-session',
             onPressed: snap.isRunning ? _newSession : null,
             icon: const Icon(Icons.add),
             label: const Text('New session'),
@@ -154,11 +182,19 @@ class _ServerBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = chat.snapshot;
-    final busy = s.status == ServerStatus.starting || s.status == ServerStatus.restarting;
+    final busy =
+        s.status == ServerStatus.starting ||
+        s.status == ServerStatus.restarting;
     final (text, action) = switch (s.status) {
       ServerStatus.starting => ('Starting the OpenCode server…', null),
-      ServerStatus.restarting => ('The server stopped unexpectedly — restarting…', null),
-      ServerStatus.failed => ('The server could not start: ${s.error ?? 'unknown error'}', 'Retry'),
+      ServerStatus.restarting => (
+        'The server stopped unexpectedly — restarting…',
+        null,
+      ),
+      ServerStatus.failed => (
+        'The server could not start: ${s.error ?? 'unknown error'}',
+        'Retry',
+      ),
       _ => ('The OpenCode server is stopped.', 'Start'),
     };
     return Card(
@@ -170,10 +206,15 @@ class _ServerBanner extends StatelessWidget {
             if (busy)
               const Padding(
                 padding: EdgeInsets.only(right: 12),
-                child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
             Expanded(child: Text(text)),
-            if (action != null) TextButton(onPressed: chat.retry, child: Text(action)),
+            if (action != null)
+              TextButton(onPressed: chat.retry, child: Text(action)),
           ],
         ),
       ),
@@ -182,7 +223,11 @@ class _ServerBanner extends StatelessWidget {
 }
 
 class _SessionTile extends StatelessWidget {
-  const _SessionTile({required this.session, required this.controller, required this.shell});
+  const _SessionTile({
+    required this.session,
+    required this.controller,
+    required this.shell,
+  });
 
   final SessionInfo session;
   final HomeController controller;
@@ -191,24 +236,44 @@ class _SessionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title: Text(session.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text('${_folder(session.directory)} · ${_ago(session.updated)}', maxLines: 1, overflow: TextOverflow.ellipsis),
-      leading: const CircleAvatar(child: Icon(Icons.chat_bubble_outline, size: 20)),
+      title: Text(
+        session.displayTitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${_folder(session.directory)} · ${_ago(session.updated)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      leading: const CircleAvatar(
+        child: Icon(Icons.chat_bubble_outline, size: 20),
+      ),
       onTap: () => shell.openChat?.call(session: session),
       trailing: PopupMenuButton<String>(
         onSelected: (v) async {
           if (v == 'rename') {
             final name = await _askName(context, session.displayTitle);
-            if (name != null && name.trim().isNotEmpty) await controller.rename(session, name.trim());
+            if (name != null && name.trim().isNotEmpty) {
+              await controller.rename(session, name.trim());
+            }
           } else if (v == 'delete') {
             final ok = await showDialog<bool>(
               context: context,
               builder: (_) => AlertDialog(
                 title: const Text('Delete this session?'),
-                content: Text('"${session.displayTitle}" and its messages will be removed. Files it created stay.'),
+                content: Text(
+                  '"${session.displayTitle}" and its messages will be removed. Files it created stay.',
+                ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Delete'),
+                  ),
                 ],
               ),
             );
@@ -245,10 +310,20 @@ Future<String?> _askName(BuildContext context, String initial) {
     context: context,
     builder: (_) => AlertDialog(
       title: const Text('Rename session'),
-      content: TextField(controller: field, autofocus: true, onSubmitted: (v) => Navigator.pop(context, v)),
+      content: TextField(
+        controller: field,
+        autofocus: true,
+        onSubmitted: (v) => Navigator.pop(context, v),
+      ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(context, field.text), child: const Text('Rename')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, field.text),
+          child: const Text('Rename'),
+        ),
       ],
     ),
   );
@@ -256,7 +331,10 @@ Future<String?> _askName(BuildContext context, String initial) {
 
 /// Pick where a new session starts: an existing folder, or a new project folder under /root/projects.
 class _NewSessionSheet extends StatefulWidget {
-  const _NewSessionSheet({required this.directories, required this.createFolder});
+  const _NewSessionSheet({
+    required this.directories,
+    required this.createFolder,
+  });
 
   final Future<List<String>> directories;
   final Future<String> Function(String name) createFolder;
@@ -292,7 +370,9 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         child: ListView(
           shrinkWrap: true,
@@ -306,16 +386,28 @@ class _NewSessionSheetState extends State<_NewSessionSheet> {
                 labelText: 'New project folder',
                 hintText: 'my-app',
                 errorText: _error,
-                suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward), tooltip: 'Create and start', onPressed: _create),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  tooltip: 'Create and start',
+                  onPressed: _create,
+                ),
               ),
               onSubmitted: (_) => _create(),
             ),
             const SizedBox(height: 16),
-            Text('Or work in an existing folder', style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              'Or work in an existing folder',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             FutureBuilder<List<String>>(
               future: widget.directories,
               builder: (context, snap) {
-                if (!snap.hasData) return const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator());
+                if (!snap.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: LinearProgressIndicator(),
+                  );
+                }
                 return Column(
                   children: [
                     for (final d in snap.data!)

@@ -9,6 +9,8 @@ import '../chat/chat_session.dart';
 import '../files/files_tab.dart';
 import '../home/home_controller.dart';
 import '../home/home_tab.dart';
+import '../pro/paywall_page.dart';
+import '../pro/pro_feature.dart';
 import '../settings/settings_tab.dart';
 import '../terminal/terminal_tab.dart';
 import 'shell_controller.dart';
@@ -164,6 +166,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             runtime: widget.deps.runtime,
             shell: _shell,
             visible: _shell.tab == ShellController.terminalTab,
+            pro: widget.deps.pro,
           ),
           SettingsTab(
             deps: widget.deps,
@@ -176,24 +179,44 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _shell.tab,
         onDestinationSelected: (tab) {
+          if (tab == ShellController.terminalTab && !widget.deps.pro.isPro) {
+            unawaited(
+              showPaywall(context, widget.deps.pro, ProFeature.terminal),
+            );
+            return;
+          }
           if (tab == ShellController.settingsTab) {
             unawaited(widget.deps.pro.refresh());
           }
           _shell.select(tab);
         },
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder),
             label: 'Files',
           ),
-          NavigationDestination(icon: Icon(Icons.terminal), label: 'Terminal'),
           NavigationDestination(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.terminal),
+                if (!widget.deps.pro.isPro)
+                  const Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Icon(Icons.lock, size: 12),
+                  ),
+              ],
+            ),
+            label: 'Terminal',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',

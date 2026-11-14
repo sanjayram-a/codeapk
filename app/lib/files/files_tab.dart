@@ -7,7 +7,12 @@ import 'files_controller.dart';
 
 /// Browse and manage the sandbox home (`/root`): folders, files, copy/move/delete, and a simple text editor.
 class FilesTab extends StatefulWidget {
-  const FilesTab({super.key, required this.runtime, required this.shell, required this.visible});
+  const FilesTab({
+    super.key,
+    required this.runtime,
+    required this.shell,
+    required this.visible,
+  });
 
   final RuntimeApi runtime;
   final ShellController shell;
@@ -31,7 +36,9 @@ class _FilesTabState extends State<FilesTab> {
   void didUpdateWidget(FilesTab old) {
     super.didUpdateWidget(old);
     _maybeLoad();
-    if (widget.visible && !old.visible) _c.refresh(); // files may have changed in chat or terminal
+    if (widget.visible && !old.visible) {
+      _c.refresh(); // files may have changed in chat or terminal
+    }
   }
 
   void _maybeLoad() {
@@ -47,16 +54,30 @@ class _FilesTabState extends State<FilesTab> {
     super.dispose();
   }
 
-  Future<String?> _prompt(String title, {String initial = '', String action = 'OK'}) {
+  Future<String?> _prompt(
+    String title, {
+    String initial = '',
+    String action = 'OK',
+  }) {
     final field = TextEditingController(text: initial);
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
-        content: TextField(controller: field, autofocus: true, onSubmitted: (v) => Navigator.pop(ctx, v)),
+        content: TextField(
+          controller: field,
+          autofocus: true,
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, field.text), child: Text(action)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, field.text),
+            child: Text(action),
+          ),
         ],
       ),
     );
@@ -66,7 +87,9 @@ class _FilesTabState extends State<FilesTab> {
     if (_c.selection.isNotEmpty) return _c.toggle(e.path);
     if (e.isDir) return _c.open(e.path);
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => FileEditorPage(runtime: widget.runtime, path: e.path)),
+      MaterialPageRoute(
+        builder: (_) => FileEditorPage(runtime: widget.runtime, path: e.path),
+      ),
     );
     if (saved == true) _c.refresh();
   }
@@ -88,9 +111,19 @@ class _FilesTabState extends State<FilesTab> {
               backgroundColor: Colors.transparent,
               appBar: AppBar(
                 leading: selecting
-                    ? IconButton(icon: const Icon(Icons.close), onPressed: _c.clearSelection)
-                    : (_c.canGoUp ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _c.up) : null),
-                title: Text(selecting ? '${_c.selection.length} selected' : 'Files'),
+                    ? IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: _c.clearSelection,
+                      )
+                    : (_c.canGoUp
+                          ? IconButton(
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: _c.up,
+                            )
+                          : null),
+                title: Text(
+                  selecting ? '${_c.selection.length} selected' : 'Files',
+                ),
                 actions: selecting ? _selectionActions() : _normalActions(),
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(44),
@@ -103,7 +136,10 @@ class _FilesTabState extends State<FilesTab> {
                       tooltip: 'Add',
                       onSelected: (v) async {
                         if (v == 'folder') {
-                          final n = await _prompt('New folder', action: 'Create');
+                          final n = await _prompt(
+                            'New folder',
+                            action: 'Create',
+                          );
                           if (n != null) await _c.createFolder(n);
                         } else if (v == 'file') {
                           final n = await _prompt('New file', action: 'Create');
@@ -115,19 +151,41 @@ class _FilesTabState extends State<FilesTab> {
                         }
                       },
                       itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'folder', child: Text('New folder')),
-                        const PopupMenuItem(value: 'file', child: Text('New file')),
-                        if (_c.hasClipboard) const PopupMenuItem(value: 'paste', child: Text('Paste here')),
-                        const PopupMenuItem(value: 'session', child: Text('New session here')),
+                        const PopupMenuItem(
+                          value: 'folder',
+                          child: Text('New folder'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'file',
+                          child: Text('New file'),
+                        ),
+                        if (_c.hasClipboard)
+                          const PopupMenuItem(
+                            value: 'paste',
+                            child: Text('Paste here'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'session',
+                          child: Text('New session here'),
+                        ),
                       ],
-                      child: const FloatingActionButton(onPressed: null, child: Icon(Icons.add)),
+                      child: const FloatingActionButton(
+                        heroTag: 'files-add',
+                        onPressed: null,
+                        child: Icon(Icons.add),
+                      ),
                     ),
               body: Column(
                 children: [
                   if (_c.error != null)
                     MaterialBanner(
                       content: Text(_c.error!),
-                      actions: [TextButton(onPressed: _c.refresh, child: const Text('Dismiss'))],
+                      actions: [
+                        TextButton(
+                          onPressed: _c.refresh,
+                          child: const Text('Dismiss'),
+                        ),
+                      ],
                     ),
                   Expanded(child: _body(context)),
                 ],
@@ -140,13 +198,25 @@ class _FilesTabState extends State<FilesTab> {
   }
 
   List<Widget> _normalActions() => [
-        if (_c.hasClipboard) IconButton(icon: const Icon(Icons.content_paste), tooltip: 'Paste here', onPressed: _c.paste),
-        IconButton(icon: const Icon(Icons.refresh), tooltip: 'Refresh', onPressed: _c.refresh),
-      ];
+    if (_c.hasClipboard)
+      IconButton(
+        icon: const Icon(Icons.content_paste),
+        tooltip: 'Paste here',
+        onPressed: _c.paste,
+      ),
+    IconButton(
+      icon: const Icon(Icons.refresh),
+      tooltip: 'Refresh',
+      onPressed: _c.refresh,
+    ),
+  ];
 
   List<Widget> _selectionActions() {
     final single = _c.selection.length == 1
-        ? _c.entries.where((e) => e.path == _c.selection.first).cast<FileEntry?>().firstOrNull
+        ? _c.entries
+              .where((e) => e.path == _c.selection.first)
+              .cast<FileEntry?>()
+              .firstOrNull
         : null;
     return [
       if (single != null)
@@ -154,7 +224,11 @@ class _FilesTabState extends State<FilesTab> {
           icon: const Icon(Icons.drive_file_rename_outline),
           tooltip: 'Rename',
           onPressed: () async {
-            final n = await _prompt('Rename', initial: single.name, action: 'Rename');
+            final n = await _prompt(
+              'Rename',
+              initial: single.name,
+              action: 'Rename',
+            );
             _c.clearSelection();
             if (n != null) await _c.rename(single, n);
           },
@@ -167,12 +241,28 @@ class _FilesTabState extends State<FilesTab> {
             final messenger = ScaffoldMessenger.of(context);
             final n = await _c.downloadSelection();
             if (n > 0) {
-              messenger.showSnackBar(SnackBar(content: Text(n == 1 ? 'Saved to Downloads' : '$n files saved to Downloads')));
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    n == 1
+                        ? 'Saved to Downloads'
+                        : '$n files saved to Downloads',
+                  ),
+                ),
+              );
             }
           },
         ),
-      IconButton(icon: const Icon(Icons.copy), tooltip: 'Copy', onPressed: _c.copySelection),
-      IconButton(icon: const Icon(Icons.content_cut), tooltip: 'Cut', onPressed: _c.cutSelection),
+      IconButton(
+        icon: const Icon(Icons.copy),
+        tooltip: 'Copy',
+        onPressed: _c.copySelection,
+      ),
+      IconButton(
+        icon: const Icon(Icons.content_cut),
+        tooltip: 'Cut',
+        onPressed: _c.cutSelection,
+      ),
       IconButton(
         icon: const Icon(Icons.delete_outline),
         tooltip: 'Delete',
@@ -181,10 +271,18 @@ class _FilesTabState extends State<FilesTab> {
             context: context,
             builder: (ctx) => AlertDialog(
               title: Text('Delete ${_c.selection.length} item(s)?'),
-              content: const Text('Folders are deleted with everything inside. This cannot be undone.'),
+              content: const Text(
+                'Folders are deleted with everything inside. This cannot be undone.',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Delete'),
+                ),
               ],
             ),
           );
@@ -195,7 +293,9 @@ class _FilesTabState extends State<FilesTab> {
   }
 
   Widget _body(BuildContext context) {
-    if (_c.loading && _c.entries.isEmpty) return const Center(child: CircularProgressIndicator());
+    if (_c.loading && _c.entries.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (_c.entries.isEmpty) {
       return const Center(child: Text('This folder is empty'));
     }
@@ -209,7 +309,11 @@ class _FilesTabState extends State<FilesTab> {
           final selected = _c.selection.contains(e.path);
           return ListTile(
             selected: selected,
-            leading: Icon(selected ? Icons.check_circle : (e.isDir ? Icons.folder : _iconFor(e.name))),
+            leading: Icon(
+              selected
+                  ? Icons.check_circle
+                  : (e.isDir ? Icons.folder : _iconFor(e.name)),
+            ),
             title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(e.isDir ? 'Folder' : _size(e.size)),
             onTap: () => _open(e),
@@ -222,9 +326,20 @@ class _FilesTabState extends State<FilesTab> {
 
   IconData _iconFor(String name) {
     final n = name.toLowerCase();
-    if (n.endsWith('.md') || n.endsWith('.txt')) return Icons.description_outlined;
-    if (n.endsWith('.json') || n.endsWith('.yaml') || n.endsWith('.yml') || n.endsWith('.toml')) return Icons.data_object;
-    if (n.endsWith('.py') || n.endsWith('.js') || n.endsWith('.ts') || n.endsWith('.sh') || n.endsWith('.dart')) {
+    if (n.endsWith('.md') || n.endsWith('.txt')) {
+      return Icons.description_outlined;
+    }
+    if (n.endsWith('.json') ||
+        n.endsWith('.yaml') ||
+        n.endsWith('.yml') ||
+        n.endsWith('.toml')) {
+      return Icons.data_object;
+    }
+    if (n.endsWith('.py') ||
+        n.endsWith('.js') ||
+        n.endsWith('.ts') ||
+        n.endsWith('.sh') ||
+        n.endsWith('.dart')) {
       return Icons.code;
     }
     return Icons.insert_drive_file_outlined;
