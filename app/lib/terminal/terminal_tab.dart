@@ -113,6 +113,12 @@ class _TerminalTabState extends State<TerminalTab> {
         cols: 80,
         command: tab.command,
       );
+      // The tab may have been closed, Pro revoked, or the widget disposed while
+      // the PTY was starting. Never keep a session the UI no longer owns.
+      if (!mounted || !widget.pro.isPro || !_tabs.contains(tab)) {
+        await session.close();
+        return;
+      }
       tab.session = session;
       tab.terminal.onOutput = (data) => session.write(_ctrl.encode(data));
       tab.terminal.onResize = (w, h, _, _) {

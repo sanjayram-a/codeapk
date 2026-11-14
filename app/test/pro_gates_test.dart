@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,6 +39,43 @@ void main() {
     await pro.initialize();
     return (FakeRuntime(), pro, g);
   }
+
+  testWidgets('revoking while a PTY starts closes the new session', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsStore(await SharedPreferences.getInstance());
+    final g = FakeBillingGateway()
+      ..purchases = const [
+        BillingPurchase(
+          productId: proProductId,
+          purchaseToken: 'tok',
+          status: BillingPurchaseStatus.purchased,
+          pendingCompletePurchase: false,
+        ),
+      ];
+    final pro = ProController(g, settings);
+    await pro.initialize();
+    final rt = _GatedOpenRuntime();
+    final shell = ShellController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalTab(runtime: rt, shell: shell, visible: true, pro: pro),
+        ),
+      ),
+    );
+    await tester.pump();
+    // The PTY has not been created yet; revoke Pro, then let it finish.
+    g.purchases = const [];
+    await pro.refresh();
+    expect(pro.isPro, isFalse);
+    rt.gate.complete();
+    await tester.pumpAndSettle();
+    expect(rt.terminals, hasLength(1));
+    expect(rt.terminals.single.closed, isTrue);
+    expect(find.text('Terminal is a Pro feature'), findsOneWidget);
+  });
 
   testWidgets('free terminal shows the lock and starts no PTY', (tester) async {
     final (rt, pro, _) = await makePro();
@@ -192,5 +231,19 @@ class _InvalidReadRuntime extends FakeRuntime {
   @override
   Future<String> readText(String path) async {
     throw PlatformException(code: 'invalid');
+  }
+}
+
+class _GatedOpenRuntime extends FakeRuntime {
+  final gate = Completer<void>();
+
+  @override
+  Future<TerminalSession> openTerminal({
+    required int rows,
+    required int cols,
+    List<String>? command,
+  }) async {
+    await gate.future;
+    return super.openTerminal(rows: rows, cols: cols, command: command);
   }
 }

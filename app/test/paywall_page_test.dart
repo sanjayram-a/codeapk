@@ -152,6 +152,18 @@ void main() {
     expect(find.text('Unlock Pro'), findsNothing);
   });
 
+  testWidgets('revoking while open shows the free body', (tester) async {
+    final (pro, g) = await make(owned: true);
+    await tester.pumpWidget(host(pro));
+    await tester.pumpAndSettle();
+    expect(find.text('You own Pro'), findsOneWidget);
+    g.purchases = const [];
+    await pro.refresh();
+    await tester.pumpAndSettle();
+    expect(find.text('You own Pro'), findsNothing);
+    expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
+  });
+
   testWidgets('restore calls the gateway', (tester) async {
     final (pro, g) = await make();
     await tester.pumpWidget(host(pro));

@@ -141,6 +141,16 @@ void main() {
     expect(rt.idleMinutes, isEmpty);
   });
 
+  testWidgets('free clamp replaces a stored 60 minute timeout', (tester) async {
+    SharedPreferences.setMockInitialValues({'idle_minutes': 60});
+    settings = SettingsStore(await SharedPreferences.getInstance());
+    await pumpSettings(tester, isPro: false);
+    final dropdown = tester.widget<DropdownButton<int>>(
+      find.byType(DropdownButton<int>),
+    );
+    expect(dropdown.value, 5);
+  });
+
   testWidgets('free can still choose five minutes', (tester) async {
     await pumpSettings(tester, isPro: false);
     await tester.ensureVisible(find.byType(DropdownButton<int>));
@@ -242,6 +252,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(CommandTaskPage), findsOneWidget);
       expect(rt.log, contains('openTerminal ${buildToolsCommand.join(' ')}'));
+      expect(buildToolsCommand.last, contains('apk add build-base'));
+      expect(buildToolsCommand.last, contains('/root/.apk-extra'));
       expect(shell.tab, isNot(ShellController.terminalTab));
       expect(find.byType(TextField), findsNothing);
     });
