@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -8,11 +9,15 @@ import '../app_deps.dart';
 import '../chat/chat_session.dart';
 import '../environment/environment_page.dart';
 import '../files/file_editor_page.dart';
+import '../pro/paywall_page.dart';
+import '../pro/pro_feature.dart';
 import '../shell/shell_controller.dart';
 import '../storage/storage_page.dart';
+import 'plan_card.dart';
 
 const opencodeConfigPath = '/root/.config/opencode/opencode.json';
-const _configTemplate = '{\n  "\$schema": "https://opencode.ai/config.json"\n}\n';
+const _configTemplate =
+    '{\n  "\$schema": "https://opencode.ai/config.json"\n}\n';
 const appVersion = '1.0.0';
 
 /// Null when [text] is a JSON object, otherwise a short message saying what is wrong.
@@ -47,7 +52,26 @@ class _SettingsTabState extends State<SettingsTab> {
   static const idleChoices = [5, 15, 30, 60];
 
   RuntimeApi get _rt => widget.deps.runtime;
-  late int _idle = widget.deps.settings.idleMinutes;
+  late int _idle = widget.deps.pro.isPro ? widget.deps.settings.idleMinutes : 5;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.deps.pro.addListener(_onProChanged);
+  }
+
+  void _onProChanged() {
+    if (!mounted) return;
+    setState(() {
+      _idle = widget.deps.pro.isPro ? widget.deps.settings.idleMinutes : 5;
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.deps.pro.removeListener(_onProChanged);
+    super.dispose();
+  }
 
   Future<void> _setIdle(int minutes) async {
     setState(() => _idle = minutes);
@@ -87,14 +111,24 @@ class _SettingsTabState extends State<SettingsTab> {
       }
     }
     if (!mounted) return;
-    final saved = await Navigator.of(context).push<bool>(MaterialPageRoute(
-      builder: (_) => FileEditorPage(runtime: _rt, path: opencodeConfigPath, validate: validateConfigJson),
-    ));
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => FileEditorPage(
+          runtime: _rt,
+          path: opencodeConfigPath,
+          validate: validateConfigJson,
+        ),
+      ),
+    );
     if (saved == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Saved. Restart the server for changes to apply.'),
-        action: SnackBarAction(label: 'Restart', onPressed: _restart),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Saved. Restart the server for changes to apply.',
+          ),
+          action: SnackBarAction(label: 'Restart', onPressed: _restart),
+        ),
+      );
     }
   }
 
@@ -107,7 +141,7 @@ class _SettingsTabState extends State<SettingsTab> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: ListenableBuilder(
-        listenable: widget.chat,
+        listenable: Listenable.merge([widget.chat, widget.deps.pro]),
         builder: (context, _) {
           final s = widget.chat.snapshot;
           return Scaffold(
@@ -115,26 +149,91 @@ class _SettingsTabState extends State<SettingsTab> {
             appBar: AppBar(title: const Text('Settings')),
             body: ListView(
               children: [
+                PlanCard(pro: widget.deps.pro),
                 const _Section('Server'),
                 ListTile(
-                  leading: Icon(s.isRunning ? Icons.circle : Icons.circle_outlined,
-                      color: s.isRunning ? Colors.green : null, size: 16),
+                  leading: Icon(
+                    s.isRunning ? Icons.circle : Icons.circle_outlined,
+                    color: s.isRunning ? Colors.green : null,
+                    size: 16,
+                  ),
                   title: Text(_statusText(s)),
                   trailing: s.isRunning
-                      ? TextButton(onPressed: _rt.stopServer, child: const Text('Stop'))
-                      : (s.status == ServerStatus.starting || s.status == ServerStatus.restarting)
-                          ? null
-                          : TextButton(onPressed: widget.chat.retry, child: const Text('Start')),
+                      ? TextButton(
+                          onPressed: _rt.stopServer,
+                          child: const Text('Stop'),
+                        )
+                      : (s.status == ServerStatus.starting ||
+                            s.status == ServerStatus.restarting)
+                      ? null
+                      : TextButton(
+                          onPressed: widget.chat.retry,
+                          child: const Text('Start'),
+                        ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.timer_outlined),
                   title: const Text('Stop the server when idle'),
-                  subtitle: const Text('After this long with the app closed and nothing running'),
+                  subtitle: const Text(
+                    'After this long with the app closed and nothing running',
+                  ),
                   trailing: DropdownButton<int>(
                     value: idleChoices.contains(_idle) ? _idle : null,
                     hint: Text('$_idle min'),
-                    items: [for (final m in idleChoices) DropdownMenuItem(value: m, child: Text('$m min'))],
-                    onChanged: (v) => v == null ? null : _setIdle(v),
+                    items: [
+                      for (final m in idleChoices)
+                        DropdownMenuItem(
+                          value: m,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                m == 5 && !widget.deps.pro.isPro
+                                    ? '5 min (Free)'
+                                    : '$m min',
+                              ),
+                              if (m > 5 && !widget.deps.pro.isPro) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Pro',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      if (v > 5 && !widget.deps.pro.isPro) {
+                        unawaited(
+                          showPaywall(
+                            context,
+                            widget.deps.pro,
+                            ProFeature.background,
+                          ),
+                        );
+                        return;
+                      }
+                      _setIdle(v);
+                    },
                   ),
                 ),
                 ListTile(
@@ -146,7 +245,9 @@ class _SettingsTabState extends State<SettingsTab> {
                 ListTile(
                   leading: const Icon(Icons.tune),
                   title: const Text('Config file'),
-                  subtitle: const Text('opencode.json — default model, providers, permissions'),
+                  subtitle: const Text(
+                    'opencode.json — default model, providers, permissions',
+                  ),
                   onTap: _openConfig,
                 ),
                 const ListTile(
@@ -161,28 +262,42 @@ class _SettingsTabState extends State<SettingsTab> {
                   leading: const Icon(Icons.developer_board),
                   title: const Text('Linux environment'),
                   subtitle: const Text('Versions, storage, build tools, reset'),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => EnvironmentPage(
-                      runtime: _rt,
-                      shell: widget.shell,
-                      onResetDone: widget.onResetDone,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => EnvironmentPage(
+                        runtime: _rt,
+                        shell: widget.shell,
+                        onResetDone: widget.onResetDone,
+                      ),
                     ),
-                  )),
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.storage),
                   title: const Text('Storage & cache'),
-                  subtitle: const Text('npm and Python cache, size of each project'),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => StoragePage(runtime: _rt),
-                  )),
+                  subtitle: const Text(
+                    'npm and Python cache, size of each project',
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => StoragePage(runtime: _rt),
+                    ),
+                  ),
                 ),
                 const _Section('About'),
-                const ListTile(leading: Icon(Icons.info_outline), title: Text('OpenCode for Android'), subtitle: Text('Version $appVersion')),
+                const ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('OpenCode Pocket'),
+                  subtitle: Text('Version $appVersion'),
+                ),
                 ListTile(
                   leading: const Icon(Icons.gavel),
                   title: const Text('Open-source licenses'),
-                  onTap: () => showLicensePage(context: context, applicationName: 'OpenCode for Android', applicationVersion: appVersion),
+                  onTap: () => showLicensePage(
+                    context: context,
+                    applicationName: 'OpenCode Pocket',
+                    applicationVersion: appVersion,
+                  ),
                 ),
               ],
             ),
@@ -193,12 +308,13 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   String _statusText(ServerSnapshot s) => switch (s.status) {
-        ServerStatus.running => 'Server running',
-        ServerStatus.starting => 'Server starting…',
-        ServerStatus.restarting => 'Server restarting…',
-        ServerStatus.failed => 'Server failed: ${s.error ?? 'unknown error'}',
-        ServerStatus.stopped => s.stopReason == 'idle' ? 'Server stopped (idle)' : 'Server stopped',
-      };
+    ServerStatus.running => 'Server running',
+    ServerStatus.starting => 'Server starting…',
+    ServerStatus.restarting => 'Server restarting…',
+    ServerStatus.failed => 'Server failed: ${s.error ?? 'unknown error'}',
+    ServerStatus.stopped =>
+      s.stopReason == 'idle' ? 'Server stopped (idle)' : 'Server stopped',
+  };
 }
 
 class _Section extends StatelessWidget {
@@ -208,7 +324,12 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-        child: Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary)),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+    child: Text(
+      label,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
+  );
 }

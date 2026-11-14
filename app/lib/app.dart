@@ -15,9 +15,13 @@ class OpencodeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const seed = Color(0xFF3F6BE0);
     return MaterialApp(
-      title: 'OpenCode',
+      title: 'OpenCode Pocket',
       theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true),
-      darkTheme: ThemeData(colorSchemeSeed: seed, brightness: Brightness.dark, useMaterial3: true),
+      darkTheme: ThemeData(
+        colorSchemeSeed: seed,
+        brightness: Brightness.dark,
+        useMaterial3: true,
+      ),
       home: AppGate(deps: deps),
     );
   }
@@ -34,7 +38,8 @@ class AppGate extends StatefulWidget {
 }
 
 class _AppGateState extends State<AppGate> {
-  late final SetupController _setup = SetupController(widget.deps.runtime)..addListener(_onSetup);
+  late final SetupController _setup = SetupController(widget.deps.runtime)
+    ..addListener(_onSetup);
   late bool _consented = widget.deps.settings.consentAccepted;
 
   @override
@@ -67,9 +72,14 @@ class _AppGateState extends State<AppGate> {
   @override
   Widget build(BuildContext context) {
     if (!_consented) {
-      return OnboardingScreen(runtime: widget.deps.runtime, onAccepted: _accept);
+      return OnboardingScreen(
+        runtime: widget.deps.runtime,
+        onAccepted: _accept,
+      );
     }
-    if (_setup.phase != SetupPhase.ready) return SetupScreen(controller: _setup);
+    if (_setup.phase != SetupPhase.ready) {
+      return SetupScreen(controller: _setup);
+    }
     return HomeShell(deps: widget.deps, onResetDone: _afterReset);
   }
 }

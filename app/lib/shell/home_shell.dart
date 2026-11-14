@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api/opencode_api.dart';
@@ -24,7 +26,10 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   late final ShellController _shell = ShellController()..addListener(_rebuild);
-  late final ChatSession _chat = ChatSession(widget.deps.runtime, isForeground: () => _resumed);
+  late final ChatSession _chat = ChatSession(
+    widget.deps.runtime,
+    isForeground: () => _resumed,
+  );
   late final HomeController _home;
   bool _resumed = true;
   OpencodeApi? _api;
@@ -36,7 +41,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     final rt = widget.deps.runtime;
     rt.setClients(1);
-    rt.setIdleTimeoutMinutes(widget.deps.settings.idleMinutes);
+    unawaited(
+      rt.setIdleTimeoutMinutes(
+        widget.deps.pro.isPro ? widget.deps.settings.idleMinutes : 5,
+      ),
+    );
+    unawaited(widget.deps.pro.initialize());
+    widget.deps.pro.addListener(_onProChanged);
     _home = HomeController(api: _currentApi, extraDirectories: _projectFolders);
     _shell.openChat = _openChat;
     _chat.addListener(_onChat);
@@ -57,7 +68,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   Future<List<String>> _projectFolders() async {
     final entries = await widget.deps.runtime.listFiles('/root/projects');
-    return [for (final e in entries) if (e.isDir) e.path];
+    return [
+      for (final e in entries)
+        if (e.isDir) e.path,
+    ];
   }
 
   void _onChat() {
@@ -66,6 +80,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void _rebuild() {
     if (mounted) setState(() {});
+  }
+
+  void _onProChanged() {
+    if (!mounted) return;
+    final minutes = widget.deps.pro.isPro
+        ? widget.deps.settings.idleMinutes
+        : 5;
+    unawaited(widget.deps.runtime.setIdleTimeoutMinutes(minutes));
+    if (!widget.deps.pro.isPro && _shell.tab == ShellController.terminalTab) {
+      _shell.select(ShellController.homeTab);
+    }
+    setState(() {});
   }
 
   Future<void> _openChat({SessionInfo? session, String? directory}) async {
@@ -77,12 +103,20 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       try {
         target = await api.createSession(directory: directory ?? '/root');
       } on OpencodeApiException catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.message)));
+        }
         return;
       }
     }
     if (!mounted) return;
-    await navigator.push(MaterialPageRoute<void>(builder: (_) => ChatPage(chat: _chat, session: target!)));
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(chat: _chat, session: target!),
+      ),
+    );
     if (mounted) _home.refresh();
   }
 
@@ -91,12 +125,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     final resumed = state == AppLifecycleState.resumed;
     _resumed = resumed;
     widget.deps.runtime.setClients(resumed ? 1 : 0);
-    if (resumed) _chat.onForeground();
+    if (resumed) {
+      _chat.onForeground();
+      unawaited(widget.deps.pro.refresh());
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.deps.pro.removeListener(_onProChanged);
     _chat.removeListener(_onChat);
     _shell.removeListener(_rebuild);
     _home.dispose();
@@ -111,9 +149,22 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       body: IndexedStack(
         index: _shell.tab,
         children: [
-          HomeTab(controller: _home, chat: _chat, shell: _shell, runtime: widget.deps.runtime),
-          FilesTab(runtime: widget.deps.runtime, shell: _shell, visible: _shell.tab == ShellController.filesTab),
-          TerminalTab(runtime: widget.deps.runtime, shell: _shell, visible: _shell.tab == ShellController.terminalTab),
+          HomeTab(
+            controller: _home,
+            chat: _chat,
+            shell: _shell,
+            runtime: widget.deps.runtime,
+          ),
+          FilesTab(
+            runtime: widget.deps.runtime,
+            shell: _shell,
+            visible: _shell.tab == ShellController.filesTab,
+          ),
+          TerminalTab(
+            runtime: widget.deps.runtime,
+            shell: _shell,
+            visible: _shell.tab == ShellController.terminalTab,
+          ),
           SettingsTab(
             deps: widget.deps,
             chat: _chat,
@@ -124,12 +175,29 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _shell.tab,
-        onDestinationSelected: _shell.select,
+        onDestinationSelected: (tab) {
+          if (tab == ShellController.settingsTab) {
+            unawaited(widget.deps.pro.refresh());
+          }
+          _shell.select(tab);
+        },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.folder_outlined), selectedIcon: Icon(Icons.folder), label: 'Files'),
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Files',
+          ),
           NavigationDestination(icon: Icon(Icons.terminal), label: 'Terminal'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
         ],
       ),
     );

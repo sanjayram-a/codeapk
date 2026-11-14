@@ -4,10 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'app_deps.dart';
+import 'pro/play_billing_gateway.dart';
+import 'pro/pro_controller.dart';
 import 'settings/settings_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  runApp(OpencodeApp(deps: AppDeps(runtime: OpencodeRuntime(), settings: SettingsStore(prefs))));
+  final settings = SettingsStore(prefs);
+  runApp(
+    OpencodeApp(
+      deps: AppDeps(
+        runtime: OpencodeRuntime(),
+        settings: settings,
+        pro: ProController(PlayBillingGateway(), settings),
+      ),
+    ),
+  );
 }
