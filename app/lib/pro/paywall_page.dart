@@ -144,32 +144,44 @@ class _PaywallPageState extends State<PaywallPage> {
     );
   }
 
-  /// Everything is sized to fit on one screen; [FittedBox] scales it down on
-  /// very small phones so there is never a scroll view.
+  /// No scroll view: the top content scales down when needed, while the price
+  /// card and Unlock button stay pinned to the bottom of the screen.
   Widget _freeBody(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: constraints.maxWidth - 40,
-              child: _freeBodyColumn(context),
+        final width = constraints.maxWidth - 40;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.topCenter,
+                child: SizedBox(width: width, child: _freeTop(context)),
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight * 0.55,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.bottomCenter,
+                  child: SizedBox(width: width, child: _freeBottom(context)),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
   }
 
-  Widget _freeBodyColumn(BuildContext context) {
+  Widget _freeTop(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final product = widget.pro.product;
-    final unavailable =
-        widget.pro.status != ProStatus.loading && product == null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -212,7 +224,20 @@ class _PaywallPageState extends State<PaywallPage> {
             fontSize: 11,
           ),
         ),
-        const SizedBox(height: 10),
+      ],
+    );
+  }
+
+  Widget _freeBottom(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final product = widget.pro.product;
+    final unavailable =
+        widget.pro.status != ProStatus.loading && product == null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
         _priceCard(context, product: product, unavailable: unavailable),
         if (widget.pro.status == ProStatus.pending) ...[
           const SizedBox(height: 8),

@@ -81,6 +81,14 @@ void main() {
         find.text('One-time purchase. No subscription. Restore anytime.'),
         findsOneWidget,
       );
+      expect(
+        tester.getBottomLeft(find.text('Unlock Pro')).dy,
+        greaterThan(size.height * 0.75),
+      );
+      expect(
+        tester.getTopLeft(find.text('₹999')).dy,
+        greaterThan(size.height * 0.5),
+      );
     }
   });
 
