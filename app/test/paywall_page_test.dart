@@ -65,6 +65,25 @@ void main() {
     expect(find.text('Build tools and cache clearing'), findsOneWidget);
   });
 
+  testWidgets('fits small phones without scrolling', (tester) async {
+    addTearDown(tester.view.reset);
+    final (pro, _) = await make();
+    for (final size in [const Size(360, 640), const Size(320, 568)]) {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(host(pro));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SingleChildScrollView), findsNothing);
+      expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
+      expect(find.text('Unlock Pro'), findsOneWidget);
+      expect(
+        find.text('One-time purchase. No subscription. Restore anytime.'),
+        findsOneWidget,
+      );
+    }
+  });
+
   testWidgets('buy forwards the product id', (tester) async {
     final (pro, g) = await make();
     await tester.pumpWidget(host(pro));

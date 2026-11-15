@@ -83,18 +83,23 @@ class _PaywallPageState extends State<PaywallPage> {
 
   Widget _topBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 0),
       child: Row(
         children: [
           IconButton.outlined(
             onPressed: _close,
             tooltip: 'Close',
+            visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.close),
           ),
           const Spacer(),
           if (!_owned)
             TextButton(
               onPressed: () => unawaited(_restore()),
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
               child: const Text('Restore'),
             ),
         ],
@@ -106,27 +111,29 @@ class _PaywallPageState extends State<PaywallPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.verified, size: 64, color: scheme.primary),
-            const SizedBox(height: 16),
+            Icon(Icons.verified, size: 48, color: scheme.primary),
+            const SizedBox(height: 12),
             Text(
               'You own Pro',
               textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall?.copyWith(
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'Lifetime access is active on this Google account.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Close'),
@@ -137,105 +144,128 @@ class _PaywallPageState extends State<PaywallPage> {
     );
   }
 
+  /// Everything is sized to fit on one screen; [FittedBox] scales it down on
+  /// very small phones so there is never a scroll view.
   Widget _freeBody(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: constraints.maxWidth - 40,
+              child: _freeBodyColumn(context),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _freeBodyColumn(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final product = widget.pro.product;
     final unavailable =
         widget.pro.status != ProStatus.loading && product == null;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Image.asset(
-                'assets/images/app_icon.png',
-                width: 112,
-                height: 112,
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              width: 72,
+              height: 72,
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Get OpenCode Pocket Pro',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Get OpenCode Pocket Pro',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          widget.feature.reason,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _comparisonTable(context),
+        const SizedBox(height: 6),
+        Text(
+          'Background run means the server stays warm after you leave the '
+          'app. A running task keeps it alive.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _priceCard(context, product: product, unavailable: unavailable),
+        if (widget.pro.status == ProStatus.pending) ...[
           const SizedBox(height: 8),
-          Text(
-            widget.feature.reason,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: scheme.onSurfaceVariant,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
             ),
-          ),
-          const SizedBox(height: 24),
-          _comparisonTable(context),
-          const SizedBox(height: 12),
-          Text(
-            'Background run means the server stays warm after you leave the '
-            'app. A running task keeps it alive.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 24),
-          _priceCard(context, product: product, unavailable: unavailable),
-          if (widget.pro.status == ProStatus.pending) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Payment pending — Google will confirm shortly.',
-              ),
-            ),
-          ],
-          if (widget.pro.error != null && product != null) ...[
-            const SizedBox(height: 16),
-            _errorRow(context, widget.pro.error!),
-          ],
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: FilledButton(
-              onPressed: _canBuy ? () => unawaited(widget.pro.buy()) : null,
-              child: widget.pro.isPurchasing
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text('Opening Google Play…'),
-                      ],
-                    )
-                  : const Text('Unlock Pro'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'One-time purchase. No subscription. Restore anytime.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
+            child: Text(
+              'Payment pending — Google will confirm shortly.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
             ),
           ),
         ],
-      ),
+        if (widget.pro.error != null && product != null) ...[
+          const SizedBox(height: 8),
+          _errorRow(context, widget.pro.error!),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton(
+            onPressed: _canBuy ? () => unawaited(widget.pro.buy()) : null,
+            child: widget.pro.isPurchasing
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text('Opening Google Play…'),
+                    ],
+                  )
+                : const Text('Unlock Pro'),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'One-time purchase. No subscription. Restore anytime.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+      ],
     );
   }
 
@@ -243,28 +273,31 @@ class _PaywallPageState extends State<PaywallPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final muted = scheme.onSurfaceVariant;
-    final headerStyle = theme.textTheme.labelMedium?.copyWith(
+    final headerStyle = theme.textTheme.labelSmall?.copyWith(
       color: muted,
       fontWeight: FontWeight.w600,
     );
 
     Widget header(String label) => Text(label, style: headerStyle);
-    Widget check(Color color) => Icon(Icons.check, size: 18, color: color);
+    Widget check(Color color) => Icon(Icons.check, size: 15, color: color);
     Widget dash(Color color) => Text('—', style: TextStyle(color: color));
     Widget value(String text) => Text(
       text,
       textAlign: TextAlign.center,
-      style: theme.textTheme.bodySmall,
+      style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
     );
 
     Widget row(String label, {required Widget free, required Widget pro}) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
           children: [
             Expanded(
               flex: 3,
-              child: Text(label, style: theme.textTheme.bodyMedium),
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              ),
             ),
             Expanded(flex: 1, child: Center(child: free)),
             Expanded(flex: 1, child: Center(child: pro)),
@@ -283,7 +316,7 @@ class _PaywallPageState extends State<PaywallPage> {
             Expanded(flex: 1, child: Center(child: header('Pro'))),
           ],
         ),
-        Divider(height: 16, color: scheme.outlineVariant),
+        Divider(height: 8, color: scheme.outlineVariant),
         row(
           'Chat, files and editor',
           free: check(muted),
@@ -325,24 +358,26 @@ class _PaywallPageState extends State<PaywallPage> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         border: Border.all(color: scheme.primary, width: 2),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: unavailable
           ? Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
                   Text(
                     "Pro isn't available right now.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.error,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   TextButton(
                     onPressed: () => unawaited(widget.pro.refresh()),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -353,51 +388,56 @@ class _PaywallPageState extends State<PaywallPage> {
               children: [
                 Container(
                   color: scheme.primaryContainer,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 16,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Text(
                     'Founder price',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: theme.textTheme.labelMedium?.copyWith(
                       color: scheme.onPrimaryContainer,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                   child: Column(
                     children: [
-                      Text('Lifetime', style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
+                      Text(
+                        'Lifetime',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
                       if (widget.pro.status == ProStatus.loading)
                         Text(
                           'Loading price…',
-                          style: theme.textTheme.displaySmall?.copyWith(
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         )
                       else
                         Text(
                           product!.price,
-                          style: theme.textTheme.displaySmall?.copyWith(
+                          style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         'one-time',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
+                          fontSize: 11,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 4),
                       Text(
                         'Lifetime access. No subscription.',
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -413,10 +453,14 @@ class _PaywallPageState extends State<PaywallPage> {
     return Row(
       children: [
         Expanded(
-          child: Text(message, style: TextStyle(color: scheme.error)),
+          child: Text(
+            message,
+            style: TextStyle(color: scheme.error, fontSize: 12),
+          ),
         ),
         TextButton(
           onPressed: () => unawaited(widget.pro.refresh()),
+          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
           child: const Text('Retry'),
         ),
       ],
