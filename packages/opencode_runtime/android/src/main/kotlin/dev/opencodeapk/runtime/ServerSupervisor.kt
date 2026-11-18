@@ -41,15 +41,17 @@ class ServerSupervisor(
     private val clock: Clock = Clock.System,
     private val heapMb: Int = 1024,
     private val startTimeoutMs: Long = 60_000,
-) {
+) : ServerBackend {
     val log = RingLog()
 
     private var current: Proc? = null
     private var pump: Thread? = null
     private var noSeccomp = false
 
+    override fun logTail(): String = log.tail(50)
+
     @Synchronized
-    fun start(extraEnv: Map<String, String>): ServerInfo {
+    override fun start(extraEnv: Map<String, String>): ServerInfo {
         stop()
         listOf(paths.home, paths.tmp, paths.prootTmp).forEach { it.mkdirs() }
         var portRetries = 0
@@ -98,7 +100,7 @@ class ServerSupervisor(
     }
 
     @Synchronized
-    fun stop() {
+    override fun stop() {
         current?.destroy()
         pump?.join(2000)
         current = null
@@ -106,7 +108,7 @@ class ServerSupervisor(
     }
 
     @Synchronized
-    fun isRunning(): Boolean = current?.isAlive() == true
+    override fun isRunning(): Boolean = current?.isAlive() == true
 
     private fun startPump(proc: Proc, attemptLog: RingLog): Thread = Thread({
         try {

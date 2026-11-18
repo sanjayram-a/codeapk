@@ -25,6 +25,8 @@ object EnvBuilder {
             // Warm caches live in /root so they survive rootfs upgrades.
             "NODE_COMPILE_CACHE" to "/root/.cache/node-compile",
             "UV_CACHE_DIR" to "/root/.cache/uv",
+            // /root is a bind mount, so the product defaults (share off, autoupdate off) live in the rootfs under /etc.
+            "OPENCODE_CONFIG" to "/etc/opencode/opencode.json",
             "npm_config_prefer_offline" to "true",
             "PIP_PREFER_BINARY" to "1",
             "NODE_OPTIONS" to "--max-old-space-size=$heapMb",

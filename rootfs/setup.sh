@@ -19,4 +19,15 @@ install -m 0755 "$(find /tmp/oc -type f -name opencode | head -1)" /usr/local/bi
 sed -i 's#^root:\(.*\):/bin/sh$#root:\1:/bin/bash#' /etc/passwd
 mkdir -p /root/projects
 
+# Product defaults. Not under /root: that is replaced by a bind mount at runtime. The app points
+# OPENCODE_CONFIG here (EnvBuilder.kt); opencode merges it with the user's own ~/.config/opencode.
+mkdir -p /etc/opencode
+cat > /etc/opencode/opencode.json <<'EOF'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "autoupdate": false
+}
+EOF
+
 rm -rf /usr/share/man /usr/share/doc /usr/share/info /var/cache/apk/* /tmp/* /root/.cache /root/.npm
