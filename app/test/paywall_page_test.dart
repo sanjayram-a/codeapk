@@ -57,6 +57,7 @@ void main() {
     expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
     expect(find.text('Terminal is a Pro feature.'), findsOneWidget);
     expect(find.text('Founder price'), findsOneWidget);
+    expect(find.text('50% OFF'), findsOneWidget);
     expect(find.text('₹999'), findsOneWidget);
     expect(find.text('Lifetime'), findsOneWidget);
     expect(find.text('Unlock Pro'), findsOneWidget);
@@ -177,6 +178,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('You own Pro'), findsOneWidget);
     expect(find.text('Unlock Pro'), findsNothing);
+    expect(find.text('Restore'), findsNothing);
   });
 
   testWidgets('revoking while open shows the free body', (tester) async {

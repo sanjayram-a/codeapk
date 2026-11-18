@@ -242,6 +242,20 @@ class ProController extends ChangeNotifier {
     }
   }
 
+  /// Called when the app returns to the foreground.
+  ///
+  /// Android does not always emit a terminal purchase event when the user
+  /// cancels the Play sheet, which would leave [isPurchasing] stuck. Clearing
+  /// it here (and re-reading the entitlement) makes cancel return to the free
+  /// state.
+  Future<void> onAppResumed() async {
+    if (_purchasing) {
+      _purchasing = false;
+      _notify();
+    }
+    await refresh();
+  }
+
   Future<void> restore() async {
     if (_purchasing) return;
     _purchasing = true;

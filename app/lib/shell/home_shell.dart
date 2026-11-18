@@ -129,7 +129,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     widget.deps.runtime.setClients(resumed ? 1 : 0);
     if (resumed) {
       _chat.onForeground();
-      unawaited(widget.deps.pro.refresh());
+      unawaited(widget.deps.pro.onAppResumed());
     }
   }
 

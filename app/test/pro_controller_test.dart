@@ -238,6 +238,23 @@ void main() {
     expect(g.buyCalls, 2);
   });
 
+  test('returning from a canceled purchase clears the purchasing lock', () async {
+    final g = FakeBillingGateway();
+    final pro = ProController(g, await settings());
+    await pro.initialize();
+    await pro.buy();
+    expect(pro.isPurchasing, isTrue);
+
+    // Android can close the Play sheet without emitting a canceled event.
+    await pro.onAppResumed();
+
+    expect(pro.isPurchasing, isFalse);
+    expect(pro.isPro, isFalse);
+    expect(pro.status, ProStatus.free);
+    await pro.buy();
+    expect(g.buyCalls, 2);
+  });
+
   test('a stream error does not revoke cached pro', () async {
     SharedPreferences.setMockInitialValues({
       'pro_owned': true,

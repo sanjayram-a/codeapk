@@ -116,6 +116,7 @@ void main() {
     await pumpSettings(tester, isPro: false);
     expect(find.text('Free plan'), findsOneWidget);
     expect(find.text('Founder price'), findsOneWidget);
+    expect(find.text('50% OFF'), findsOneWidget);
     await tester.tap(find.text('Unlock lifetime Pro'));
     await tester.pumpAndSettle();
     expect(find.text('Get OpenCode Pocket Pro'), findsOneWidget);
@@ -125,6 +126,7 @@ void main() {
     await pumpSettings(tester);
     expect(find.text('Pro — lifetime'), findsOneWidget);
     expect(find.text('Unlock lifetime Pro'), findsNothing);
+    expect(find.text('Restore purchases'), findsNothing);
   });
 
   testWidgets('free cannot choose an idle timeout above five minutes', (

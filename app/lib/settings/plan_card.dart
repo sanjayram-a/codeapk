@@ -113,7 +113,10 @@ class PlanCard extends StatelessWidget {
                 ),
                 if (!isPro && pro.status == ProStatus.free) ...[
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -121,18 +124,36 @@ class PlanCard extends StatelessWidget {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: scheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: scheme.outlineVariant),
                         ),
                         child: Text(
                           'Founder price',
                           style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onPrimaryContainer,
+                            color: scheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '50% OFF',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
                       Text(
                         pro.product == null
                             ? 'Price unavailable'
@@ -142,35 +163,30 @@ class PlanCard extends StatelessWidget {
                     ],
                   ),
                 ],
-                const SizedBox(height: 12),
-                if (isPro)
-                  TextButton(
-                    onPressed: pro.isPurchasing
-                        ? null
-                        : () => unawaited(pro.restore()),
-                    child: const Text('Restore purchases'),
-                  )
-                else if (pro.status == ProStatus.pending)
-                  TextButton(
-                    onPressed: () => unawaited(pro.refresh()),
-                    child: const Text('Refresh status'),
-                  )
-                else if (pro.status == ProStatus.loading ||
-                    pro.status == ProStatus.error)
-                  TextButton(
-                    onPressed: () => unawaited(pro.refresh()),
-                    child: const Text('Retry'),
-                  )
-                else
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      onPressed: () => unawaited(
-                        showPaywall(context, pro, ProFeature.generic),
+                if (!isPro) ...[
+                  const SizedBox(height: 12),
+                  if (pro.status == ProStatus.pending)
+                    TextButton(
+                      onPressed: () => unawaited(pro.refresh()),
+                      child: const Text('Refresh status'),
+                    )
+                  else if (pro.status == ProStatus.loading ||
+                      pro.status == ProStatus.error)
+                    TextButton(
+                      onPressed: () => unawaited(pro.refresh()),
+                      child: const Text('Retry'),
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonal(
+                        onPressed: () => unawaited(
+                          showPaywall(context, pro, ProFeature.generic),
+                        ),
+                        child: const Text('Unlock lifetime Pro'),
                       ),
-                      child: const Text('Unlock lifetime Pro'),
                     ),
-                  ),
+                ],
               ],
             ),
           ),
